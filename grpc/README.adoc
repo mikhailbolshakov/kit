@@ -1,0 +1,460 @@
+= gRPC Package
+
+A Go library for building gRPC clients and servers with built-in authentication, middleware, health checks, and comprehensive error handling.
+
+== Features
+
+* **gRPC Client**: Easy client setup with authentication and interceptors
+* **gRPC Server**: Production-ready server with middleware chain
+* **Authentication**: JWT-based internal authentication
+* **Health Checks**: Built-in health check service
+* **Error Handling**: Automatic error conversion and logging
+* **Panic Recovery**: Automatic panic recovery with stack traces
+* **Context Propagation**: Seamless context and metadata handling
+* **Monitoring**: Built-in metrics and tracing support
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/grpc"
+----
+
+== Configuration
+
+=== Client Configuration
+
+[source,go]
+----
+type ClientConfig struct {
+    Host string
+    Port string
+    Auth ClientAuthConfig
+}
+
+type ClientAuthConfig struct {
+    Enabled     bool   // Enable authentication
+    TokenSecret string // Secret for JWT token generation
+    TokenTTL    int    // Token TTL in seconds
+    Caller      string // Caller identifier
+}
+----
+
+=== Server Configuration
+
+[source,go]
+----
+type ServerConfig struct {
+    Host  string
+    Port  string
+    Trace bool               // Enable request/response tracing
+    Auth  ServerAuthConfig
+}
+
+type ServerAuthConfig struct {
+    Enabled bool   // Enable authentication
+    Secret  string // Secret for JWT verification
+}
+----
+
+== gRPC Client
+
+=== Basic Setup
+
+[source,go]
+----
+// Without authentication
+config := &grpc.ClientConfig{
+    Host: "localhost",
+    Port: "9000",
+}
+
+client, err := grpc.NewClient(config)
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Conn.Close()
+----
+
+=== With Authentication
+
+[source,go]
+----
+// With internal authentication
+config := &grpc.ClientConfig{
+    Host: "localhost",
+    Port: "9000",
+    Auth: grpc.ClientAuthConfig{
+        Enabled:     true,
+        TokenSecret: "your-secret-key",
+        TokenTTL:    3600, // 1 hour
+        Caller:      "my-service",
+    },
+}
+
+client, err := grpc.NewClient(config)
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Conn.Close()
+----
+
+=== Using the Client
+
+[source,go]
+----
+// Example with generated gRPC client
+userServiceClient := pb.NewUserServiceClient(client.Conn)
+
+// Wait for server readiness
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+ready := client.WaitForReady(ctx)
+if !ready {
+    log.Fatal("Server not ready")
+}
+
+// Make gRPC calls
+user, err := userServiceClient.GetUser(ctx, &pb.GetUserRequest{
+    Id: "123",
+})
+if err != nil {
+    log.Printf("Error: %v", err)
+    return
+}
+
+fmt.Printf("User: %+v\n", user)
+----
+
+== gRPC Server
+
+=== Basic Setup
+
+[source,go]
+----
+// Server configuration
+config := &grpc.ServerConfig{
+    Host:  "localhost",
+    Port:  "9000",
+    Trace: false, // Enable for debugging
+}
+
+// Create server
+server, err := grpc.NewServer("user-service", logger, config)
+if err != nil {
+    log.Fatal(err)
+}
+defer server.Close()
+----
+
+=== With Authentication
+
+[source,go]
+----
+config := &grpc.ServerConfig{
+    Host:  "localhost",
+    Port:  "9000",
+    Trace: true,
+    Auth: grpc.ServerAuthConfig{
+        Enabled: true,
+        Secret:  "your-secret-key",
+    },
+}
+
+server, err := grpc.NewServer("user-service", logger, config)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== Register Services and Start
+
+[source,go]
+----
+// Register your gRPC service
+pb.RegisterUserServiceServer(server.Srv, &userServiceImpl{})
+
+// Start server
+ctx := context.Background()
+err = server.Listen(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== Async Server Start
+
+[source,go]
+----
+// Start server asynchronously with automatic restart
+server.ListenAsync(ctx)
+
+// Server runs in background with unlimited retries
+// Your main application can continue
+time.Sleep(time.Hour) // Keep main goroutine alive
+----
+
+== Examples
+
+=== Simple Client-Server
+
+[source,go]
+----
+// Server
+func startServer() {
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    config := &grpc.ServerConfig{
+        Port: "9000",
+    }
+
+    server, err := grpc.NewServer("greeter-service", logger, config)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer server.Close()
+
+    // Register service implementation
+    pb.RegisterGreeterServer(server.Srv, &greeterService{})
+
+    ctx := context.Background()
+    if err := server.Listen(ctx); err != nil {
+        log.Fatal(err)
+    }
+}
+
+// Client
+func callServer() {
+    config := &grpc.ClientConfig{
+        Host: "localhost",
+        Port: "9000",
+    }
+
+    client, err := grpc.NewClient(config)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Conn.Close()
+
+    greeterClient := pb.NewGreeterClient(client.Conn)
+
+    response, err := greeterClient.SayHello(context.Background(), &pb.HelloRequest{
+        Name: "World",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Response: %s\n", response.Message)
+}
+----
+
+=== Authenticated Service
+
+[source,go]
+----
+// Server with authentication
+func startAuthenticatedServer() {
+    config := &grpc.ServerConfig{
+        Port: "9000",
+        Auth: grpc.ServerAuthConfig{
+            Enabled: true,
+            Secret:  "my-secret-key",
+        },
+    }
+
+    server, err := grpc.NewServer("secure-service", logger, config)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    pb.RegisterSecureServiceServer(server.Srv, &secureService{})
+
+    ctx := context.Background()
+    server.ListenAsync(ctx)
+}
+
+// Client with authentication
+func callAuthenticatedServer() {
+    config := &grpc.ClientConfig{
+        Host: "localhost",
+        Port: "9000",
+        Auth: grpc.ClientAuthConfig{
+            Enabled:     true,
+            TokenSecret: "my-secret-key",
+            TokenTTL:    3600,
+            Caller:      "client-service",
+        },
+    }
+
+    client, err := grpc.NewClient(config)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Conn.Close()
+
+    secureClient := pb.NewSecureServiceClient(client.Conn)
+
+    data, err := secureClient.GetSecureData(context.Background(), &pb.SecureRequest{
+        Query: "sensitive-data",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Secure data: %+v\n", data)
+}
+----
+
+=== Microservice with Health Checks
+
+[source,go]
+----
+func startMicroservice() {
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    config := &grpc.ServerConfig{
+        Port:  "9000",
+        Trace: true,
+        Auth: grpc.ServerAuthConfig{
+            Enabled: true,
+            Secret:  "service-secret",
+        },
+    }
+
+    server, err := grpc.NewServer("user-service", logger, config)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Register business service
+    pb.RegisterUserServiceServer(server.Srv, &userService{})
+
+    // Health check is automatically registered
+
+    ctx := context.Background()
+
+    // Start server asynchronously
+    server.ListenAsync(ctx)
+
+    // Simulate service lifecycle
+    fmt.Println("Service started on port 9000")
+
+    // Keep service running
+    select {}
+}
+
+func checkHealth() {
+    config := &grpc.ClientConfig{
+        Host: "localhost",
+        Port: "9000",
+    }
+
+    client, err := grpc.NewClient(config)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Conn.Close()
+
+    // Wait for service to be ready
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    if client.WaitForReady(ctx) {
+        fmt.Println("Service is healthy and ready")
+    } else {
+        fmt.Println("Service is not ready")
+    }
+}
+----
+
+== Authentication
+
+The package provides built-in JWT-based authentication:
+
+=== Client Side
+* Automatically generates JWT tokens
+* Adds authorization header to all requests
+* Configurable token TTL and caller identification
+
+=== Server Side
+* Validates JWT tokens on incoming requests
+* Extracts caller information from tokens
+* Protects all registered services
+
+== Error Handling
+
+Automatic error handling and conversion:
+
+[source,go]
+----
+// Server errors are automatically converted to gRPC status codes
+func (s *userService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
+    if req.Id == "" {
+        return nil, fmt.Errorf("user ID is required") // Automatically converted to InvalidArgument
+    }
+
+    user, err := s.userRepo.FindByID(req.Id)
+    if err != nil {
+        return nil, err // Error details logged and converted
+    }
+
+    return user, nil
+}
+----
+
+== Health Checks
+
+Built-in health check service:
+
+[source,go]
+----
+// Health check client
+healthClient := grpc_health_v1.NewHealthClient(client.Conn)
+
+response, err := healthClient.Check(context.Background(), &grpc_health_v1.HealthCheckRequest{
+    Service: "user-service",
+})
+
+if err != nil {
+    log.Printf("Health check failed: %v", err)
+} else {
+    fmt.Printf("Service status: %v\n", response.Status)
+}
+----
+
+== Middleware Chain
+
+The package automatically applies middleware:
+
+1. **Context propagation** - Request context and metadata
+2. **Authentication** - JWT token validation (if enabled)
+3. **Recovery** - Panic recovery with logging
+4. **Tracing** - Request/response tracing (if enabled)
+5. **Error conversion** - Automatic gRPC status conversion
+6. **Metrics** - Built-in monitoring support
+
+== Best Practices
+
+1. **Authentication**: Use authentication for internal service communication
+2. **Health Checks**: Always implement health check endpoints
+3. **Context Usage**: Use context for cancellation and timeouts
+4. **Error Handling**: Let the middleware handle error conversion
+5. **Tracing**: Enable tracing only for debugging
+6. **Async Start**: Use `ListenAsync` for background services
+7. **Graceful Shutdown**: Always call `Close()` on servers
+
+== Dependencies
+
+* gRPC Go libraries
+* gRPC middleware ecosystem
+* ChatLab Kit utilities for logging and context management
+
+== Thread Safety
+
+Both clients and servers are thread-safe and designed for concurrent use in production environments.

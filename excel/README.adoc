@@ -1,0 +1,471 @@
+= Excel Package
+
+A Go library for reading Excel files, providing simple methods to extract data from Excel spreadsheets with automatic sheet detection and row parsing.
+
+== Features
+
+* Read Excel files from `io.ReadCloser` streams
+* Automatic active sheet detection
+* Fallback to first available sheet
+* Simple row-based data extraction
+* Built-in error handling
+* Support for multiple Excel formats (.xlsx, .xlsm, .xltx, .xltm)
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/excel"
+----
+
+== Basic Usage
+
+=== Read from File
+
+[source,go]
+----
+// Open Excel file
+file, err := os.Open("data.xlsx")
+if err != nil {
+    log.Fatal(err)
+}
+defer file.Close()
+
+// Read all rows from the Excel file
+rows, err := excel.ReadFromReader(file)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Process the data
+for i, row := range rows {
+    fmt.Printf("Row %d: %v\n", i+1, row)
+}
+----
+
+=== Read from HTTP Response
+
+[source,go]
+----
+// Download Excel file from URL
+resp, err := http.Get("https://example.com/data.xlsx")
+if err != nil {
+    log.Fatal(err)
+}
+defer resp.Body.Close()
+
+// Read Excel data directly from HTTP response
+rows, err := excel.ReadFromReader(resp.Body)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Process rows
+for _, row := range rows {
+    for j, cell := range row {
+        fmt.Printf("Column %d: %s\t", j+1, cell)
+    }
+    fmt.Println()
+}
+----
+
+=== Parse Structured Data
+
+[source,go]
+----
+// Read Excel file
+file, err := os.Open("employees.xlsx")
+if err != nil {
+    log.Fatal(err)
+}
+defer file.Close()
+
+rows, err := excel.ReadFromReader(file)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Skip header row and parse data
+if len(rows) > 1 {
+    header := rows[0]
+    fmt.Printf("Headers: %v\n", header)
+
+    for i, row := range rows[1:] {
+        fmt.Printf("Employee %d:\n", i+1)
+        for j, cell := range row {
+            if j < len(header) {
+                fmt.Printf("  %s: %s\n", header[j], cell)
+            }
+        }
+        fmt.Println()
+    }
+}
+----
+
+== Complete Examples
+
+=== Employee Data Processing
+
+[source,go]
+----
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+    "strconv"
+
+    "gitlab.com/algmib/kit/excel"
+)
+
+type Employee struct {
+    ID         int
+    Name       string
+    Department string
+    Salary     float64
+    Email      string
+}
+
+func main() {
+    // Open Excel file
+    file, err := os.Open("employees.xlsx")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer file.Close()
+
+    // Read Excel data
+    rows, err := excel.ReadFromReader(file)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    if len(rows) == 0 {
+        log.Fatal("No data found in Excel file")
+    }
+
+    // Parse employees (assuming header row exists)
+    var employees []Employee
+
+    for i, row := range rows[1:] { // Skip header
+        if len(row) < 5 {
+            log.Printf("Skipping row %d: insufficient columns", i+2)
+            continue
+        }
+
+        id, err := strconv.Atoi(row[0])
+        if err != nil {
+            log.Printf("Invalid ID in row %d: %s", i+2, row[0])
+            continue
+        }
+
+        salary, err := strconv.ParseFloat(row[3], 64)
+        if err != nil {
+            log.Printf("Invalid salary in row %d: %s", i+2, row[3])
+            continue
+        }
+
+        employee := Employee{
+            ID:         id,
+            Name:       row[1],
+            Department: row[2],
+            Salary:     salary,
+            Email:      row[4],
+        }
+
+        employees = append(employees, employee)
+    }
+
+    // Process employees
+    fmt.Printf("Loaded %d employees:\n", len(employees))
+    for _, emp := range employees {
+        fmt.Printf("- %s (ID: %d) - %s - $%.2f - %s\n",
+            emp.Name, emp.ID, emp.Department, emp.Salary, emp.Email)
+    }
+}
+----
+
+=== Sales Report Processing
+
+[source,go]
+----
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+    "strconv"
+    "time"
+)
+
+type Sale struct {
+    Date     string
+    Product  string
+    Quantity int
+    Price    float64
+    Total    float64
+}
+
+func processSalesReport(filename string) ([]Sale, error) {
+    file, err := os.Open(filename)
+    if err != nil {
+        return nil, err
+    }
+    defer file.Close()
+
+    rows, err := excel.ReadFromReader(file)
+    if err != nil {
+        return nil, err
+    }
+
+    if len(rows) <= 1 {
+        return nil, fmt.Errorf("no data rows found")
+    }
+
+    var sales []Sale
+
+    // Process data rows (skip header)
+    for i, row := range rows[1:] {
+        if len(row) < 5 {
+            log.Printf("Skipping row %d: insufficient columns", i+2)
+            continue
+        }
+
+        quantity, err := strconv.Atoi(row[2])
+        if err != nil {
+            log.Printf("Invalid quantity in row %d: %s", i+2, row[2])
+            continue
+        }
+
+        price, err := strconv.ParseFloat(row[3], 64)
+        if err != nil {
+            log.Printf("Invalid price in row %d: %s", i+2, row[3])
+            continue
+        }
+
+        total, err := strconv.ParseFloat(row[4], 64)
+        if err != nil {
+            log.Printf("Invalid total in row %d: %s", i+2, row[4])
+            continue
+        }
+
+        sale := Sale{
+            Date:     row[0],
+            Product:  row[1],
+            Quantity: quantity,
+            Price:    price,
+            Total:    total,
+        }
+
+        sales = append(sales, sale)
+    }
+
+    return sales, nil
+}
+
+func main() {
+    sales, err := processSalesReport("sales.xlsx")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Calculate summary statistics
+    totalRevenue := 0.0
+    productSales := make(map[string]float64)
+
+    for _, sale := range sales {
+        totalRevenue += sale.Total
+        productSales[sale.Product] += sale.Total
+    }
+
+    fmt.Printf("Sales Report Summary:\n")
+    fmt.Printf("Total Sales: %d\n", len(sales))
+    fmt.Printf("Total Revenue: $%.2f\n", totalRevenue)
+    fmt.Println("\nTop Products:")
+
+    for product, revenue := range productSales {
+        fmt.Printf("- %s: $%.2f\n", product, revenue)
+    }
+}
+----
+
+=== HTTP Upload Processing
+
+[source,go]
+----
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "log"
+
+    "gitlab.com/algmib/kit/excel"
+)
+
+func handleExcelUpload(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+
+    // Parse multipart form
+    err := r.ParseMultipartForm(10 << 20) // 10MB max
+    if err != nil {
+        http.Error(w, "Failed to parse form", http.StatusBadRequest)
+        return
+    }
+
+    // Get file from form
+    file, header, err := r.FormFile("excel_file")
+    if err != nil {
+        http.Error(w, "Failed to get file", http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
+
+    fmt.Printf("Received file: %s\n", header.Filename)
+
+    // Read Excel data
+    rows, err := excel.ReadFromReader(file)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Failed to read Excel file: %v", err), http.StatusBadRequest)
+        return
+    }
+
+    // Process data
+    response := fmt.Sprintf("Successfully processed Excel file with %d rows\n", len(rows))
+
+    if len(rows) > 0 {
+        response += fmt.Sprintf("First row has %d columns\n", len(rows[0]))
+        if len(rows) > 1 {
+            response += fmt.Sprintf("Data preview (first 3 rows):\n")
+            for i := 0; i < len(rows) && i < 3; i++ {
+                response += fmt.Sprintf("Row %d: %v\n", i+1, rows[i])
+            }
+        }
+    }
+
+    w.Header().Set("Content-Type", "text/plain")
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte(response))
+}
+
+func main() {
+    http.HandleFunc("/upload", handleExcelUpload)
+
+    fmt.Println("Server starting on :8080")
+    log.Fatal(http.ListenAndServe(":8080", nil))
+}
+----
+
+== Data Validation and Conversion
+
+[source,go]
+----
+// Helper functions for data validation and conversion
+func validateAndParseRow(row []string, expectedColumns int) (map[string]string, error) {
+    if len(row) < expectedColumns {
+        return nil, fmt.Errorf("expected %d columns, got %d", expectedColumns, len(row))
+    }
+
+    result := make(map[string]string)
+    headers := []string{"id", "name", "email", "age", "department"}
+
+    for i, value := range row {
+        if i < len(headers) {
+            result[headers[i]] = strings.TrimSpace(value)
+        }
+    }
+
+    return result, nil
+}
+
+func parseExcelWithValidation(filename string) error {
+    file, err := os.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+
+    rows, err := excel.ReadFromReader(file)
+    if err != nil {
+        return err
+    }
+
+    for i, row := range rows[1:] { // Skip header
+        data, err := validateAndParseRow(row, 5)
+        if err != nil {
+            log.Printf("Row %d validation error: %v", i+2, err)
+            continue
+        }
+
+        // Process validated data
+        fmt.Printf("Valid record: %v\n", data)
+    }
+
+    return nil
+}
+----
+
+== Error Handling
+
+The package provides custom error handling for common scenarios:
+
+[source,go]
+----
+rows, err := excel.ReadFromReader(file)
+if err != nil {
+    // Handle specific error types
+    log.Printf("Excel processing error: %v", err)
+
+    // You can check for specific error conditions
+    // based on the error message or implement
+    // custom error types as needed
+    return
+}
+
+// Always check if data was read successfully
+if len(rows) == 0 {
+    log.Println("Warning: No data found in Excel file")
+    return
+}
+
+fmt.Printf("Successfully read %d rows\n", len(rows))
+----
+
+== Sheet Selection Logic
+
+The package automatically selects sheets using this priority:
+
+1. **Active Sheet**: Uses the currently active sheet if one is set
+2. **First Sheet**: Falls back to the first available sheet (lowest index)
+
+This ensures reliable data extraction even when sheet structure varies.
+
+== Supported Excel Formats
+
+* `.xlsx` - Excel 2007+ format
+* `.xlsm` - Excel macro-enabled workbook
+* `.xltx` - Excel template
+* `.xltm` - Excel macro-enabled template
+
+== Best Practices
+
+1. **Always Close Readers**: Ensure `io.ReadCloser` is properly closed
+2. **Validate Data**: Check row and column counts before processing
+3. **Handle Empty Cells**: Excel cells may be empty strings
+4. **Error Handling**: Always check for errors when reading files
+5. **Memory Usage**: Be mindful of memory usage with large Excel files
+6. **Data Types**: All cell values are returned as strings - convert as needed
+7. **Header Rows**: Consider whether your Excel files have header rows
+
+== Dependencies
+
+* Excelize v2 library for Excel file processing
+
+== Thread Safety
+
+The `ReadFromReader` function is thread-safe and can be called concurrently from multiple goroutines.

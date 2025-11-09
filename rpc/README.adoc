@@ -1,0 +1,200 @@
+= RPC Package
+
+A Go library for asynchronous RPC communication over message brokers, providing simple client-server messaging with request-response patterns, timeouts, and cluster support for distributed applications.
+
+== Features
+
+* Asynchronous RPC client and server communication
+* Request-response pattern with callbacks
+* Configurable timeouts and expiration handling
+* Message type registration and routing
+* Cluster support with distributed key management
+* Built-in request pooling with TTL
+* Thread-safe operations
+* Support for custom message body types
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/rpc"
+----
+
+== Basic Usage
+
+=== Simple RPC Client
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "gitlab.com/algmib/kit/rpc"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Create RPC client with configuration
+    config := &rpc.Config{
+        CallTimeOut: 30 * time.Second,
+    }
+
+    client := setupRpcClient(config) // Setup omitted for brevity
+
+    // Start client
+    client.Start(ctx)
+    defer client.Close(ctx)
+
+    // Create message
+    msg := &rpc.Message{
+        Type:             rpc.MessageType(1),
+        Key:              "user:123",
+        RequestId:        "req-001",
+        ResponseRequired: true,
+        Body:             map[string]interface{}{"action": "get_user"},
+    }
+
+    // Make RPC call with response callback
+    err := client.Call(ctx, msg, func(ctx context.Context, rqMsg, rsMsg *rpc.Message) error {
+        fmt.Printf("Response received: %v\n", rsMsg.Body)
+        return nil
+    })
+
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("RPC call completed")
+}
+----
+
+=== Simple RPC Server
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "gitlab.com/algmib/kit/rpc"
+)
+
+type UserRequest struct {
+    UserID string `json:"user_id"`
+    Action string `json:"action"`
+}
+
+func main() {
+    ctx := context.Background()
+
+    server := setupRpcServer() // Setup omitted for brevity
+
+    // Register message type with handler
+    server.RegisterType(
+        rpc.MessageType(1),
+        func(ctx context.Context, msg *rpc.Message) error {
+            // Process request
+            fmt.Printf("Processing message: %v\n", msg.Body)
+
+            // Send response
+            response := &rpc.Message{
+                Type:      rpc.MessageType(1),
+                RequestId: msg.RequestId,
+                Key:       msg.Key,
+                Body:      map[string]interface{}{"status": "success", "data": "user_data"},
+            }
+
+            return server.Response(ctx, response)
+        },
+        func() interface{} { return &UserRequest{} }, // Type provider
+    )
+
+    // Start server
+    server.Start(ctx)
+    defer server.Close(ctx)
+
+    fmt.Println("RPC server started")
+
+    // Keep server running
+    select {}
+}
+----
+
+== Configuration
+
+[source,go]
+----
+config := &rpc.Config{
+    CallTimeOut:    30 * time.Second,  // Request timeout
+    ClusterSupport: true,              // Enable cluster support
+}
+----
+
+== Message Types
+
+[source,go]
+----
+// Define message structure
+msg := &rpc.Message{
+    Type:             rpc.MessageType(1),    // Message type identifier
+    Key:              "business_key",        // Business key for routing
+    RequestId:        "unique_request_id",   // Unique request identifier
+    ResponseRequired: true,                  // Whether response is expected
+    Body:             requestData,           // Message payload
+}
+----
+
+== Error Handling
+
+[source,go]
+----
+// Set expiration callback for timeouts
+client.SetExpirationCallback(func(ctx context.Context, msg *rpc.Message) error {
+    log.Printf("Request expired: %s", msg.RequestId)
+    return nil
+})
+
+// Handle RPC call errors
+err := client.Call(ctx, msg, responseCallback)
+if err != nil {
+    log.Printf("RPC call failed: %v", err)
+}
+----
+
+== Cluster Support
+
+[source,go]
+----
+// Create distributed keys manager
+distributedKeys := rpc.NewDistributedKeys()
+
+// Set keys for current replica
+distributedKeys.Set("user:123")
+distributedKeys.Set("order:456")
+
+// Check if key belongs to current replica
+if distributedKeys.Check("user:123") {
+    // Process message for this key
+}
+
+// Remove key when no longer needed
+distributedKeys.Remove("user:123")
+----
+
+== Dependencies
+
+* Message broker integration (Kafka, etc.)
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+All RPC operations are thread-safe and can be used concurrently from multiple goroutines.

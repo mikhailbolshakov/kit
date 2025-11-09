@@ -1,0 +1,162 @@
+= Localization Package
+
+A Go library for managing translations and localization, providing simple methods to store, retrieve, and manage multi-language translations with database storage and caching support.
+
+== Features
+
+* Store and retrieve translations by key and language
+* Support for multiple languages with configurable defaults
+* Category-based translation organization
+* Full-text search capabilities
+* Database storage with Redis caching
+* Automatic translation key generation
+* Bulk translation operations
+* Object translation support for structs implementing Translatable interface
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/localization"
+----
+
+== Basic Usage
+
+=== Store and Retrieve Translations
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "gitlab.com/algmib/kit/localization"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Configure translation service (setup code omitted for brevity)
+    service := setupTranslationService()
+
+    // Store translations
+    translations := []*localization.TranslationByKey{
+        {
+            Key:      "welcome_message",
+            Category: "ui",
+            Translations: localization.TranslationKV{
+                "en": "Welcome to our application!",
+                "es": "¡Bienvenido a nuestra aplicación!",
+                "fr": "Bienvenue dans notre application!",
+            },
+        },
+    }
+
+    keys, err := service.Merge(ctx, translations...)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Stored translation keys: %v\n", keys)
+
+    // Retrieve translation
+    translation, err := service.Get(ctx, "welcome_message", "es")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Spanish translation: %s\n", translation.Value)
+}
+----
+
+=== Translate Objects
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "gitlab.com/algmib/kit/localization"
+)
+
+// User implements Translatable interface
+type User struct {
+    ID   int
+    Role string
+}
+
+func (u *User) GetTranslatedKeys() []string {
+    return []string{
+        fmt.Sprintf("role_%s", u.Role),
+        "user_welcome_message",
+    }
+}
+
+func main() {
+    ctx := context.Background()
+    service := setupTranslationService()
+
+    user := &User{ID: 1, Role: "admin"}
+
+    // Translate user object to Spanish
+    translations, err := service.TranslateObjects(ctx, "es", user)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("User translations: %v\n", translations)
+
+    // Safe translation that returns keys if translation fails
+    safeTranslations := service.MustTranslateObjects(ctx, "es", user)
+    fmt.Printf("Safe translations: %v\n", safeTranslations)
+}
+----
+
+== Configuration
+
+[source,go]
+----
+config := &localization.Config{
+    Languages: struct {
+        Default   string
+        Supported []string
+    }{
+        Default:   "en",
+        Supported: []string{"en", "es", "fr", "de"},
+    },
+}
+----
+
+== Error Handling
+
+[source,go]
+----
+// Safe retrieval - returns nil if not found
+translation, err := service.Get(ctx, "missing_key", "en")
+if err != nil {
+    log.Printf("Translation error: %v", err)
+}
+
+// Required retrieval - errors if not found
+translation, err = service.MustGet(ctx, "required_key", "en")
+if err != nil {
+    log.Fatal("Required translation not found:", err)
+}
+----
+
+== Dependencies
+
+* PostgreSQL storage via `gitlab.com/algmib/kit/storages/pg`
+* Redis caching via `gitlab.com/algmib/kit/storages/redis`
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+The translation service is thread-safe and can be used concurrently from multiple goroutines.

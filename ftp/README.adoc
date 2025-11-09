@@ -1,0 +1,141 @@
+
+= FTP Package
+
+A Go library for FTP operations, providing simple methods to read and upload files to FTP servers with URL-based addressing.
+
+== Features
+
+* Read files from FTP servers using URLs
+* Upload files to FTP servers using URLs
+* URL-based FTP connection with embedded credentials
+* Automatic connection management and cleanup
+* Built-in error handling with context support
+* Support for both FTP and FTPS protocols
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/ftp"
+----
+
+== Basic Usage
+
+=== Read File from FTP Server
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "gitlab.com/algmib/kit/ftp"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // FTP URL with credentials
+    url := "ftp://username:password@ftp.example.com:21/path/to/file.txt"
+
+    // Read file content
+    content, err := ftp.ReadFileByUrl(ctx, url)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("File content: %s\n", string(content))
+}
+----
+
+=== Upload File to FTP Server
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+
+    "gitlab.com/algmib/kit/ftp"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // FTP URL with credentials
+    url := "ftp://username:password@ftp.example.com:21/upload/newfile.txt"
+
+    // Content to upload
+    content := []byte("Hello, FTP World!")
+
+    // Upload file
+    err := ftp.LoadFileByUrl(ctx, url, content)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("File uploaded successfully!")
+}
+----
+
+== URL Format
+
+FTP URLs must follow this format:
+
+[source,text]
+----
+ftp://username:password@hostname:port/path/to/file
+----
+
+**Examples:**
+[source,text]
+----
+ftp://user123:pass456@ftp.example.com:21/documents/file.txt
+ftp://admin:secret@192.168.1.100:21/backups/data.zip
+----
+
+== Error Handling
+
+[source,go]
+----
+ctx := context.Background()
+
+content, err := ftp.ReadFileByUrl(ctx, ftpURL)
+if err != nil {
+    log.Printf("FTP read error: %v", err)
+    return
+}
+
+fmt.Println("Operation completed successfully")
+----
+
+== Context Support
+
+All operations support Go's context for cancellation and timeouts:
+
+[source,go]
+----
+// With timeout
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+content, err := ftp.ReadFileByUrl(ctx, ftpURL)
+if err != nil {
+    if ctx.Err() == context.DeadlineExceeded {
+        log.Println("FTP operation timed out")
+    }
+}
+----
+
+== Dependencies
+
+* `github.com/jlaffaye/ftp` - FTP client library
+
+== Thread Safety
+
+The package functions are thread-safe and can be called concurrently from multiple goroutines.

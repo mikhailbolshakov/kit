@@ -1,0 +1,279 @@
+= MinIO Package
+
+A Go library for MinIO object storage operations, providing simple file upload, download, metadata management, and bucket operations with built-in logging and error handling.
+
+== Features
+
+* File upload and download operations
+* Metadata management with custom attributes
+* Bucket creation and existence checking
+* File existence verification
+* File copying between buckets
+* File deletion operations
+* SSL/TLS support
+* Built-in logging and error handling
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/minio"
+----
+
+== Basic Usage
+
+=== Simple File Operations
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+    "strings"
+
+    "gitlab.com/algmib/kit/minio"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Configure MinIO connection
+    config := &minio.Config{
+        Host:      "localhost",
+        Port:      "9000",
+        AccessKey: "minioadmin",
+        SecretKey: "minioadmin",
+        Ssl:       false,
+    }
+
+    // Create MinIO client
+    client, err := minio.New(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    bucketName := "documents"
+
+    // Create bucket if it doesn't exist
+    if !client.IsBucketExist(ctx, bucketName) {
+        err = client.CreateBucket(ctx, bucketName)
+        if err != nil {
+            log.Fatal(err)
+        }
+        log.Println("Bucket created successfully")
+    }
+
+    // Prepare file info and content
+    fileInfo := &minio.FileInfo{
+        Id:          "doc123.txt",
+        Filename:    "document.txt",
+        BucketName:  bucketName,
+        Extension:   ".txt",
+        ContentType: "text/plain",
+        Metadata: map[string]string{
+            "author":      "John Doe",
+            "department":  "Engineering",
+        },
+    }
+
+    content := strings.NewReader("This is a sample document content.")
+
+    // Upload file
+    err = client.Put(ctx, fileInfo, content)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Println("File uploaded successfully")
+
+    // Download file
+    reader, err := client.Get(ctx, bucketName, "doc123.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Read content (you would typically copy this to a file or process it)
+    log.Println("File downloaded successfully")
+}
+----
+
+=== Advanced File Management
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "io"
+    "log"
+    "os"
+
+    "gitlab.com/algmib/kit/minio"
+)
+
+func main() {
+    ctx := context.Background()
+
+    config := &minio.Config{
+        Host:      "minio.example.com",
+        Port:      "9000",
+        AccessKey: "access_key",
+        SecretKey: "secret_key",
+        Ssl:       true,
+    }
+
+    client, err := minio.New(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    bucketName := "images"
+    fileID := "profile_pic_123.jpg"
+
+    // Check if file exists
+    if client.IsFileExist(ctx, bucketName, fileID) {
+        log.Println("File already exists")
+
+        // Get metadata
+        metadata, err := client.GetMetadata(ctx, bucketName, fileID)
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        fmt.Printf("File info: %+v\n", metadata)
+
+        // Copy to backup bucket
+        backupBucket := "backups"
+        backupFileID := "backup_" + fileID
+
+        if !client.IsBucketExist(ctx, backupBucket) {
+            err = client.CreateBucket(ctx, backupBucket)
+            if err != nil {
+                log.Fatal(err)
+            }
+        }
+
+        err = client.Copy(ctx, bucketName, fileID, backupBucket, backupFileID)
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        log.Println("File copied to backup bucket")
+
+        // Download and save to local file
+        reader, err := client.Get(ctx, bucketName, fileID)
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        localFile, err := os.Create("downloaded_" + fileID)
+        if err != nil {
+            log.Fatal(err)
+        }
+        defer localFile.Close()
+
+        _, err = io.Copy(localFile, reader)
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        log.Println("File saved locally")
+
+        // Delete original file
+        err = client.Delete(ctx, bucketName, fileID)
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        log.Println("Original file deleted")
+    } else {
+        log.Println("File does not exist")
+    }
+}
+----
+
+== Configuration
+
+[source,go]
+----
+config := &minio.Config{
+    Host:      "localhost",     // MinIO server host
+    Port:      "9000",          // MinIO server port
+    AccessKey: "minioadmin",    // Access key
+    SecretKey: "minioadmin",    // Secret key
+    Ssl:       false,           // Enable/disable SSL
+}
+----
+
+== File Information Structure
+
+[source,go]
+----
+fileInfo := &minio.FileInfo{
+    Id:           "unique_file_id",       // File identifier in storage
+    Filename:     "original_name.jpg",    // Original filename
+    BucketName:   "my_bucket",            // Bucket name
+    Extension:    ".jpg",                 // File extension
+    LastModified: "2023-01-01T12:00:00Z", // Last modification time
+    Size:         1024,                   // File size in bytes
+    ContentType:  "image/jpeg",           // MIME type
+    Metadata: map[string]string{          // Custom metadata
+        "author": "John Doe",
+        "tags":   "photo,vacation",
+    },
+}
+----
+
+== Error Handling
+
+[source,go]
+----
+// Handle connection errors
+client, err := minio.New(config, logger)
+if err != nil {
+    log.Printf("Failed to create MinIO client: %v", err)
+    return
+}
+
+// Handle upload errors
+err = client.Put(ctx, fileInfo, content)
+if err != nil {
+    log.Printf("Upload failed: %v", err)
+    return
+}
+
+// Handle download errors
+reader, err := client.Get(ctx, bucketName, fileID)
+if err != nil {
+    log.Printf("Download failed: %v", err)
+    return
+}
+----
+
+== Bucket Management
+
+[source,go]
+----
+// Check if bucket exists
+if !client.IsBucketExist(ctx, "my-bucket") {
+    // Create bucket
+    err := client.CreateBucket(ctx, "my-bucket")
+    if err != nil {
+        log.Printf("Failed to create bucket: %v", err)
+    }
+}
+----
+
+== Dependencies
+
+* `github.com/minio/minio-go/v7` - MinIO Go SDK
+* `github.com/mitchellh/mapstructure` - Struct mapping
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+The MinIO client is thread-safe and can be used concurrently from multiple goroutines.

@@ -1,0 +1,197 @@
+= S3 Client Package
+
+A Go client library for interacting with Amazon S3, providing simplified methods for file operations including presigned URLs, uploads, downloads, and deletions.
+
+== Features
+
+* Presigned URL generation for secure file uploads and downloads
+* Support for both public and private S3 buckets
+* File upload with automatic key generation and prefixes
+* Direct file retrieval and deletion
+* Built-in error handling with custom error codes
+* TTL configuration for presigned URLs
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/aws/s3"
+----
+
+== Configuration
+
+The S3 client requires configuration through the `Config` struct:
+
+[source,go]
+----
+type Config struct {
+    PublicBucketName            string `mapstructure:"public_bucket_name"`
+    PublicBucketUploadQueueName string `mapstructure:"public_bucket_upload_queue_name"`
+    PrivateBucketName           string `mapstructure:"private_bucket_name"`
+    PrivateBucketUploadQueue    string `mapstructure:"private_bucket_upload_queue_name"`
+    PresignedLinkTTL            int64  `mapstructure:"presigned_link_ttl"`
+}
+----
+
+== Usage
+
+=== Basic Setup
+
+[source,go]
+----
+// Initialize the client
+client := s3.NewClient(awsConfig, s3Config, logger)
+
+// Initialize AWS connection
+err := client.Init(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== File Upload Links
+
+==== New File Upload
+Generate a presigned URL for uploading a new file:
+
+[source,go]
+----
+uploadURL, key, err := client.GetNewFileUploadLink(
+    ctx,
+    true,        // private bucket
+    true,        // with prefix
+    "user123",   // owner ID
+    "photo.jpg", // file name
+    "images",    // category
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Use uploadURL to upload file via HTTP PUT
+// Store the returned key for future operations
+----
+
+==== Update Existing File
+Generate a presigned URL for updating an existing file:
+
+[source,go]
+----
+uploadURL, err := client.GetUpdateFileUploadLink(
+    ctx,
+    true,     // private bucket
+    fileKey,  // existing file key
+)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== File Download Links
+
+Generate URLs for downloading files:
+
+[source,go]
+----
+// For public files (direct S3 URL)
+downloadURL, err := client.GetGetFileLink(ctx, false, fileKey)
+
+// For private files (presigned URL)
+downloadURL, err := client.GetGetFileLink(ctx, true, fileKey)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== Direct File Operations
+
+==== Download File Content
+Retrieve file content directly:
+
+[source,go]
+----
+reader, err := client.GetFileByKey(ctx, true, fileKey)
+if err != nil {
+    log.Fatal(err)
+}
+defer reader.Close()
+
+// Read file content
+content, err := io.ReadAll(reader)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+==== Delete File
+Remove a file from S3:
+
+[source,go]
+----
+err := client.DeleteFileByKey(ctx, true, fileKey)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+== Key Generation
+
+The package automatically generates organized S3 keys:
+
+* *With prefix*: `category/ownerId/randomCode_fileName`
+* *Without prefix*: `category/ownerId/fileName`
+
+Example: `images/user123/ABC123_photo.jpg`
+
+== Error Handling
+
+The package defines custom error codes for different operations:
+
+* `S3-001`: Presign put object errors
+* `S3-002`: Delete object errors
+* `S3-003`: Get object errors
+* `S3-004`: URL build failures
+
+[source,go]
+----
+if err != nil {
+    // Check for specific S3 errors
+    if strings.Contains(err.Error(), "S3-001") {
+        // Handle presign error
+    }
+}
+----
+
+== Interface Compliance
+
+The client implements the `S3` interface:
+
+[source,go]
+----
+type S3 interface {
+    PresignPutObject(ctx context.Context, rq *ObjectInput) (*PresignedHTTPRequest, error)
+    PresignGetPublicObjectUrl(path string) string
+    PresignGetObject(ctx context.Context, rq *ObjectInput) (*PresignedHTTPRequest, error)
+    DeleteObject(ctx context.Context, rq *ObjectInput) error
+    GetObject(ctx context.Context, rq *ObjectInput) (*GetObjectOutput, error)
+}
+----
+
+== Best Practices
+
+1. *Always use contexts*: All methods accept context for proper cancellation and timeouts
+2. *Close readers*: Remember to close `io.ReadCloser` returned by `GetFileByKey`
+3. *Error handling*: Check and handle specific error codes for better error management
+4. *Key storage*: Store the returned keys from upload operations for future file access
+5. *TTL configuration*: Set appropriate `PresignedLinkTTL` values based on your security requirements
+
+== Dependencies
+
+* AWS SDK for Go v2
+* ChatLab Kit utilities for logging and error handling
+
+== Thread Safety
+
+The S3 client is thread-safe and can be used concurrently across multiple goroutines.
+
+

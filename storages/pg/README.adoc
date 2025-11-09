@@ -1,0 +1,339 @@
+= PostgreSQL Package
+
+A Go library for PostgreSQL database connectivity using GORM, providing simple connection management, query helpers, JSONB utilities, and pagination support with built-in logging and error handling.
+
+== Features
+
+* PostgreSQL database connection management using GORM
+* JSONB data type utilities and conversion helpers
+* Pagination and sorting helpers
+* Query scoping functions
+* Null string handling utilities
+* Built-in logging and error handling
+* Support for connection strings or individual parameters
+* Master-slave database cluster configuration
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/pg"
+----
+
+== Basic Usage
+
+=== Simple Connection Setup
+
+[source,go]
+----
+package main
+
+import (
+    "log"
+
+    "gitlab.com/algmib/kit/pg"
+)
+
+func main() {
+    // Configure PostgreSQL connection
+    config := &pg.DbConfig{
+        Host:     "localhost",
+        Port:     "5432",
+        User:     "postgres",
+        Password: "password",
+        DBName:   "myapp",
+    }
+
+    // Open connection
+    storage, err := pg.Open(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer storage.Close()
+
+    // Use GORM instance
+    db := storage.Instance
+
+    // Example: Auto-migrate a model
+    type User struct {
+        pg.GormDto
+        ID    uint   `gorm:"primarykey"`
+        Name  string `gorm:"size:255"`
+        Email string `gorm:"uniqueIndex;size:255"`
+    }
+
+    err = db.AutoMigrate(&User{})
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Create user
+    user := User{
+        Name:  "John Doe",
+        Email: "john@example.com",
+    }
+
+    result := db.Create(&user)
+    if result.Error != nil {
+        log.Fatal(result.Error)
+    }
+
+    log.Printf("User created with ID: %d", user.ID)
+}
+----
+
+=== Advanced Usage with JSONB and Pagination
+
+[source,go]
+----
+package main
+
+import (
+    "log"
+
+    "gitlab.com/algmib/kit"
+    "gitlab.com/algmib/kit/pg"
+    "github.com/jackc/pgtype"
+)
+
+type Product struct {
+    pg.GormDto
+    ID          uint           `gorm:"primarykey"`
+    Name        string         `gorm:"size:255"`
+    Description *string        `gorm:"type:text"`
+    Price       float64        `gorm:"type:decimal(10,2)"`
+    Metadata    *pgtype.JSONB  `gorm:"type:jsonb"`
+    Tags        []string       `gorm:"type:text[]"`
+}
+
+type ProductMetadata struct {
+    Category    string            `json:"category"`
+    Attributes  map[string]string `json:"attributes"`
+    InStock     bool              `json:"in_stock"`
+}
+
+func main() {
+    config := &pg.DbConfig{
+        ConnectionString: "postgres://user:pass@localhost/myapp?sslmode=disable",
+    }
+
+    storage, err := pg.Open(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer storage.Close()
+
+    db := storage.Instance
+
+    // Auto-migrate
+    err = db.AutoMigrate(&Product{})
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Create product with JSONB metadata
+    metadata := ProductMetadata{
+        Category: "electronics",
+        Attributes: map[string]string{
+            "brand":  "TechCorp",
+            "model":  "TC-2023",
+            "color":  "black",
+        },
+        InStock: true,
+    }
+
+    jsonbData, err := pg.ToJsonb(&metadata)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    product := Product{
+        Name:        "Smart Phone",
+        Description: pg.StringToNull("Latest smartphone with advanced features"),
+        Price:       999.99,
+        Metadata:    jsonbData,
+        Tags:        []string{"smartphone", "electronics", "mobile"},
+    }
+
+    result := db.Create(&product)
+    if result.Error != nil {
+        log.Fatal(result.Error)
+    }
+
+    // Query with pagination
+    pagingRequest := kit.PagingRequest{
+        Index: 1,
+        Size:  10,
+        SortBy: []*kit.SortRequest{
+            {Field: "price", Desc: true},
+            {Field: "name", Desc: false},
+        },
+    }
+
+    var products []Product
+    var total int64
+
+    // Count total
+    db.Model(&Product{}).Count(&total)
+
+    // Get paginated results
+    result = db.Scopes(pg.Paging(pagingRequest)).Find(&products)
+    if result.Error != nil {
+        log.Fatal(result.Error)
+    }
+
+    log.Printf("Found %d products (total: %d)", len(products), total)
+
+    // Process results
+    for _, prod := range products {
+        log.Printf("Product: %s - $%.2f", prod.Name, prod.Price)
+
+        // Extract JSONB metadata
+        if prod.Metadata != nil {
+            meta, err := pg.FromJsonb[ProductMetadata](prod.Metadata)
+            if err == nil && meta != nil {
+                log.Printf("  Category: %s, In Stock: %t", meta.Category, meta.InStock)
+            }
+        }
+    }
+}
+----
+
+== Configuration Options
+
+[source,go]
+----
+// Using individual parameters
+config := &pg.DbConfig{
+    Host:     "localhost",
+    Port:     "5432",
+    User:     "postgres",
+    Password: "password",
+    DBName:   "myapp",
+}
+
+// Using connection string (overrides individual parameters)
+config := &pg.DbConfig{
+    ConnectionString: "postgres://user:pass@localhost:5432/dbname?sslmode=require",
+}
+
+// Cluster configuration with master/slave
+clusterConfig := &pg.DbClusterConfig{
+    Master: &pg.DbConfig{
+        Host:   "master.db.example.com",
+        Port:   "5432",
+        User:   "app_user",
+        Password: "password",
+        DBName: "production",
+    },
+    Slave: &pg.DbConfig{
+        Host:   "slave.db.example.com",
+        Port:   "5432",
+        User:   "readonly_user",
+        Password: "password",
+        DBName: "production",
+    },
+}
+----
+
+== JSONB Utilities
+
+[source,go]
+----
+// Convert map to JSONB
+data := map[string]interface{}{
+    "category": "electronics",
+    "specs":    map[string]string{"cpu": "Intel i7", "ram": "16GB"},
+}
+jsonbData, err := pg.MapToJsonb(data)
+
+// Convert struct to JSONB
+type Config struct {
+    Theme    string `json:"theme"`
+    Language string `json:"language"`
+}
+config := &Config{Theme: "dark", Language: "en"}
+jsonbData, err := pg.ToJsonb(config)
+
+// Convert JSONB back to struct
+configFromDB, err := pg.FromJsonb[Config](jsonbData)
+----
+
+== Pagination Helpers
+
+[source,go]
+----
+// Create paging request
+pagingRequest := kit.PagingRequest{
+    Index: 2,    // Page number (1-based)
+    Size:  20,   // Items per page
+    SortBy: []*kit.SortRequest{
+        {Field: "created_at", Desc: true},
+    },
+}
+
+// Apply pagination to query
+var users []User
+db.Scopes(pg.Paging(pagingRequest)).Find(&users)
+
+// Common ordering scopes
+db.Scopes(pg.OrderByCreatedAt(true)).Find(&users)  // DESC
+db.Scopes(pg.OrderByUpdatedAt(false)).Find(&users) // ASC
+----
+
+== Query Helpers
+
+[source,go]
+----
+// Get single record
+var user User
+db.Scopes(pg.Single()).Where("email = ?", "john@example.com").First(&user)
+
+// Merge/Upsert operations
+db.Scopes(pg.Merge()).Create(&user)
+
+// Update operations (omit created_at)
+db.Scopes(pg.Update()).Save(&user)
+
+// String array matching
+tags := []string{"golang", "database"}
+db.Scopes(pg.WhereStrings("tags", tags)).Find(&products)
+----
+
+== Error Handling
+
+[source,go]
+----
+// Handle connection errors
+storage, err := pg.Open(config, logger)
+if err != nil {
+    log.Printf("Failed to connect to PostgreSQL: %v", err)
+    return
+}
+
+// Handle query errors
+result := db.Create(&user)
+if result.Error != nil {
+    log.Printf("Failed to create user: %v", result.Error)
+    return
+}
+
+// Handle JSONB conversion errors
+jsonbData, err := pg.ToJsonb(&data)
+if err != nil {
+    log.Printf("JSONB conversion failed: %v", err)
+    return
+}
+----
+
+== Dependencies
+
+* `gorm.io/gorm` - GORM ORM library
+* `gorm.io/driver/postgres` - PostgreSQL driver for GORM
+* `github.com/jackc/pgtype` - PostgreSQL data types
+* `github.com/lib/pq` - PostgreSQL driver utilities
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+GORM connections are thread-safe and can be used concurrently from multiple goroutines.

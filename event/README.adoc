@@ -1,0 +1,447 @@
+= Event Package
+
+A Go library providing both type-safe generic event handlers and a flexible event bus system for decoupled application architecture and event-driven programming.
+
+== Features
+
+* **Generic Event Handler**: Type-safe event handling with generics
+* **Event Bus**: Flexible publish-subscribe pattern with reflection-based handlers
+* **Synchronous & Asynchronous Execution**: Support for both sync and async event processing
+* **Once Handlers**: Subscribe to events that execute only once
+* **Transactional Async**: Serial execution of async handlers when needed
+* **Context-aware**: All operations support context for cancellation and timeouts
+* **Thread Safety**: Concurrent access protection with proper locking
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/event"
+----
+
+== Generic Event Handler
+
+Type-safe event handling for specific data types.
+
+=== Basic Usage
+
+[source,go]
+----
+// Define your event data type
+type UserCreated struct {
+    ID    string
+    Name  string
+    Email string
+}
+
+// Create event handler
+userCreatedEvent := event.NewEventHandler[UserCreated](logger)
+
+// Register handlers
+userCreatedEvent.Register(func(ctx context.Context, data UserCreated) error {
+    fmt.Printf("User created: %s (%s)\n", data.Name, data.Email)
+    return nil
+})
+
+userCreatedEvent.Register(func(ctx context.Context, data UserCreated) error {
+    // Send welcome email
+    return sendWelcomeEmail(ctx, data.Email)
+})
+
+// Execute synchronously
+user := UserCreated{
+    ID:    "123",
+    Name:  "John Doe",
+    Email: "john@example.com",
+}
+
+err := userCreatedEvent.Execute(ctx, user)
+if err != nil {
+    log.Printf("Error executing handlers: %v", err)
+}
+----
+
+=== Asynchronous Execution
+
+[source,go]
+----
+// Execute all handlers asynchronously
+userCreatedEvent.ExecuteAsync(ctx, user)
+
+// Wait for all async handlers to complete
+userCreatedEvent.Wait()
+----
+
+=== Multiple Event Types
+
+[source,go]
+----
+type OrderPlaced struct {
+    OrderID    string
+    CustomerID string
+    Amount     float64
+}
+
+type PaymentProcessed struct {
+    OrderID   string
+    PaymentID string
+    Amount    float64
+}
+
+// Create separate handlers for each event type
+orderEvent := event.NewEventHandler[OrderPlaced](logger)
+paymentEvent := event.NewEventHandler[PaymentProcessed](logger)
+
+// Register handlers
+orderEvent.Register(func(ctx context.Context, data OrderPlaced) error {
+    return processInventory(ctx, data.OrderID)
+})
+
+paymentEvent.Register(func(ctx context.Context, data PaymentProcessed) error {
+    return updateOrderStatus(ctx, data.OrderID, "paid")
+})
+----
+
+== Event Bus
+
+Flexible publish-subscribe system using reflection for dynamic event handling.
+
+=== Basic Usage
+
+[source,go]
+----
+// Create event bus
+bus := event.New(logger)
+
+// Subscribe to events
+err := bus.Subscribe("user.created", func(ctx context.Context, userID string, userName string) {
+    fmt.Printf("User %s created with ID: %s\n", userName, userID)
+})
+
+err = bus.Subscribe("user.created", func(ctx context.Context, userID string, userName string) {
+    // Send notification
+    sendNotification(ctx, userID, "Welcome!")
+})
+
+// Publish events
+bus.Publish(ctx, "user.created", "123", "John Doe")
+----
+
+=== Subscription Types
+
+==== Synchronous Subscription
+
+[source,go]
+----
+// Regular subscription - executes synchronously
+err := bus.Subscribe("order.placed", func(ctx context.Context, orderID string) {
+    fmt.Printf("Processing order: %s\n", orderID)
+})
+----
+
+==== Asynchronous Subscription
+
+[source,go]
+----
+// Async subscription - non-blocking execution
+err := bus.SubscribeAsync("email.send", func(ctx context.Context, to, subject, body string) {
+    sendEmail(ctx, to, subject, body)
+}, false) // false = concurrent execution
+
+// Async with transactional (serial) execution
+err := bus.SubscribeAsync("payment.process", func(ctx context.Context, orderID string) {
+    processPayment(ctx, orderID)
+}, true) // true = serial execution
+----
+
+==== One-time Subscriptions
+
+[source,go]
+----
+// Execute only once, then automatically unsubscribe
+err := bus.SubscribeOnce("app.started", func(ctx context.Context) {
+    fmt.Println("Application started - this runs only once")
+})
+
+// Async one-time subscription
+err := bus.SubscribeOnceAsync("migration.complete", func(ctx context.Context, version string) {
+    fmt.Printf("Database migrated to version: %s\n", version)
+})
+----
+
+=== Event Management
+
+[source,go]
+----
+// Check if topic has subscribers
+if bus.HasCallback("user.created") {
+    bus.Publish(ctx, "user.created", "123", "John Doe")
+}
+
+// Unsubscribe specific handler
+handler := func(ctx context.Context, msg string) {
+    fmt.Println(msg)
+}
+bus.Subscribe("test.topic", handler)
+bus.Unsubscribe("test.topic", handler)
+
+// Wait for all async handlers to complete
+bus.WaitAsync()
+----
+
+== Complete Examples
+
+=== E-commerce Event System
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+
+    "gitlab.com/algmib/kit"
+    "gitlab.com/algmib/kit/event"
+)
+
+type Order struct {
+    ID         string
+    CustomerID string
+    Items      []string
+    Total      float64
+}
+
+type User struct {
+    ID    string
+    Name  string
+    Email string
+}
+
+func main() {
+    ctx := context.Background()
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    // Create event bus
+    bus := event.New(logger)
+
+    // Subscribe to order events
+    bus.Subscribe("order.placed", func(ctx context.Context, order Order) {
+        fmt.Printf("Order placed: %s for customer %s\n", order.ID, order.CustomerID)
+
+        // Process inventory
+        for _, item := range order.Items {
+            fmt.Printf("Reserving item: %s\n", item)
+        }
+    })
+
+    // Async email notification
+    bus.SubscribeAsync("order.placed", func(ctx context.Context, order Order) {
+        fmt.Printf("Sending order confirmation email for order: %s\n", order.ID)
+        time.Sleep(500 * time.Millisecond) // Simulate email sending
+        fmt.Printf("Email sent for order: %s\n", order.ID)
+    }, false)
+
+    // User registration events with generic handler
+    userRegisteredEvent := event.NewEventHandler[User](logger)
+
+    userRegisteredEvent.Register(func(ctx context.Context, user User) error {
+        fmt.Printf("User registered: %s (%s)\n", user.Name, user.Email)
+        return nil
+    })
+
+    userRegisteredEvent.Register(func(ctx context.Context, user User) error {
+        fmt.Printf("Sending welcome email to: %s\n", user.Email)
+        return nil
+    })
+
+    // Publish events
+    order := Order{
+        ID:         "ORD-001",
+        CustomerID: "CUST-123",
+        Items:      []string{"laptop", "mouse"},
+        Total:      1299.99,
+    }
+
+    bus.Publish(ctx, "order.placed", order)
+
+    user := User{
+        ID:    "USER-456",
+        Name:  "Alice Johnson",
+        Email: "alice@example.com",
+    }
+
+    userRegisteredEvent.ExecuteAsync(ctx, user)
+
+    // Wait for async operations
+    bus.WaitAsync()
+    userRegisteredEvent.Wait()
+}
+----
+
+=== Application Lifecycle Events
+
+[source,go]
+----
+func setupApplicationEvents(bus event.Bus, logger kit.CLoggerFunc) {
+    // Application startup
+    bus.SubscribeOnce("app.start", func(ctx context.Context, version string) {
+        fmt.Printf("Application starting - version: %s\n", version)
+    })
+
+    // Database connection events
+    bus.Subscribe("db.connected", func(ctx context.Context, dbName string) {
+        fmt.Printf("Connected to database: %s\n", dbName)
+    })
+
+    bus.Subscribe("db.disconnected", func(ctx context.Context, dbName string) {
+        fmt.Printf("Disconnected from database: %s\n", dbName)
+    })
+
+    // Health check events
+    bus.SubscribeAsync("health.check", func(ctx context.Context, service string, status string) {
+        fmt.Printf("Health check for %s: %s\n", service, status)
+
+        if status == "unhealthy" {
+            // Trigger alerts
+            bus.Publish(ctx, "alert.service.down", service)
+        }
+    }, false)
+
+    // Alert handling
+    bus.SubscribeAsync("alert.service.down", func(ctx context.Context, service string) {
+        fmt.Printf("ALERT: Service %s is down!\n", service)
+        // Send alerts to monitoring systems
+    }, false)
+}
+
+func main() {
+    ctx := context.Background()
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    bus := event.New(logger)
+    setupApplicationEvents(bus, logger)
+
+    // Simulate application lifecycle
+    bus.Publish(ctx, "app.start", "v1.2.3")
+    bus.Publish(ctx, "db.connected", "postgres")
+    bus.Publish(ctx, "health.check", "api-service", "healthy")
+    bus.Publish(ctx, "health.check", "cache-service", "unhealthy")
+
+    bus.WaitAsync()
+}
+----
+
+=== Integration with Domain Events
+
+[source,go]
+----
+// Domain events using generic handlers
+type AccountCreated struct {
+    AccountID string
+    UserID    string
+    Type      string
+}
+
+type TransactionCompleted struct {
+    TransactionID string
+    AccountID     string
+    Amount        float64
+    Type          string
+}
+
+func setupDomainEvents(logger kit.CLoggerFunc) {
+    // Account events
+    accountCreatedEvent := event.NewEventHandler[AccountCreated](logger)
+    accountCreatedEvent.Register(func(ctx context.Context, event AccountCreated) error {
+        fmt.Printf("Account created: %s for user %s\n", event.AccountID, event.UserID)
+        return nil
+    })
+
+    // Transaction events
+    transactionEvent := event.NewEventHandler[TransactionCompleted](logger)
+    transactionEvent.Register(func(ctx context.Context, event TransactionCompleted) error {
+        fmt.Printf("Transaction %s completed: %.2f (%s)\n",
+            event.TransactionID, event.Amount, event.Type)
+        return nil
+    })
+
+    transactionEvent.Register(func(ctx context.Context, event TransactionCompleted) error {
+        // Update account balance
+        return updateAccountBalance(ctx, event.AccountID, event.Amount, event.Type)
+    })
+
+    // Execute events
+    ctx := context.Background()
+
+    accountEvent := AccountCreated{
+        AccountID: "ACC-001",
+        UserID:    "USER-123",
+        Type:      "checking",
+    }
+    accountCreatedEvent.Execute(ctx, accountEvent)
+
+    txEvent := TransactionCompleted{
+        TransactionID: "TX-001",
+        AccountID:     "ACC-001",
+        Amount:        100.00,
+        Type:          "deposit",
+    }
+    transactionEvent.Execute(ctx, txEvent)
+}
+
+func updateAccountBalance(ctx context.Context, accountID string, amount float64, txType string) error {
+    fmt.Printf("Updating balance for account %s: %.2f (%s)\n", accountID, amount, txType)
+    return nil
+}
+----
+
+== Error Handling
+
+[source,go]
+----
+// Generic event handlers return errors
+userEvent := event.NewEventHandler[User](logger)
+userEvent.Register(func(ctx context.Context, user User) error {
+    if user.Email == "" {
+        return fmt.Errorf("user email is required")
+    }
+    return sendEmail(ctx, user.Email)
+})
+
+// Execute and handle errors
+err := userEvent.Execute(ctx, user)
+if err != nil {
+    log.Printf("Event handler error: %v", err)
+}
+
+// Bus errors are handled internally and logged
+// Check if topic exists before publishing
+if !bus.HasCallback("unknown.topic") {
+    log.Println("No handlers for topic")
+}
+----
+
+== Best Practices
+
+1. **Type Safety**: Use generic event handlers for type-safe event handling
+2. **Event Bus Flexibility**: Use event bus for dynamic, loosely-coupled systems
+3. **Async for I/O**: Use async handlers for I/O operations to avoid blocking
+4. **Error Handling**: Always handle errors in generic event handlers
+5. **Context Usage**: Pass context for proper cancellation and timeouts
+6. **Wait for Async**: Call `WaitAsync()` or `Wait()` before application shutdown
+7. **Topic Naming**: Use consistent topic naming conventions (e.g., `domain.action`)
+
+== Dependencies
+
+* ChatLab Kit utilities for logging and goroutine management
+* Go 1.18+ for generics support
+
+== Thread Safety
+
+Both the event bus and generic event handlers are thread-safe and can be used concurrently from multiple goroutines.

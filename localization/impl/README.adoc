@@ -1,0 +1,19 @@
+== Database Setup
+
+Create the required `data_translations` table:
+
+[source,sql]
+----
+CREATE TABLE data_translations
+(
+    key      VARCHAR NOT NULL PRIMARY KEY,
+    category VARCHAR,
+    en       VARCHAR,
+    sr       VARCHAR,
+    ru       VARCHAR,
+    fts      tsvector
+);
+
+-- Create GIN index for full-text search capabilities
+CREATE INDEX idx_data_trans_fts ON data_translations USING gin(fts);
+----

@@ -1,0 +1,245 @@
+= ClickHouse Package
+
+A Go library for ClickHouse database connectivity, providing simple connection management with support for both native connections and standard SQL database interfaces, including Kafka engine configuration.
+
+== Features
+
+* ClickHouse database connection management
+* Native ClickHouse connection and standard SQL DB interface
+* Built-in logging and debug support
+* Kafka engine configuration support
+* Connection health checking with ping
+* Automatic connection cleanup
+* Server version detection
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/clickhouse"
+----
+
+== Basic Usage
+
+=== Native ClickHouse Connection
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+
+    "gitlab.com/algmib/kit/clickhouse"
+)
+
+func main() {
+    // Configure ClickHouse connection
+    config := &clickhouse.Config{
+        Host:     "localhost",
+        Port:     "9000",
+        Database: "default",
+        User:     "default",
+        Password: "",
+        Debug:    true,
+    }
+
+    // Open native connection
+    ch, err := clickhouse.Open(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer ch.Close()
+
+    // Use native connection for operations
+    ctx := context.Background()
+
+    // Execute query
+    rows, err := ch.Instance.Query(ctx, "SELECT version()")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var version string
+        err := rows.Scan(&version)
+        if err != nil {
+            log.Fatal(err)
+        }
+        log.Printf("ClickHouse version: %s", version)
+    }
+}
+----
+
+=== Standard SQL Database Interface
+
+[source,go]
+----
+package main
+
+import (
+    "database/sql"
+    "log"
+
+    "gitlab.com/algmib/kit/clickhouse"
+)
+
+func main() {
+    config := &clickhouse.Config{
+        Host:     "localhost",
+        Port:     "9000",
+        Database: "analytics",
+        User:     "default",
+        Password: "",
+        Debug:    false,
+    }
+
+    // Open standard SQL DB connection
+    db, err := clickhouse.OpenDb(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // Create table
+    _, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS events (
+            id UInt64,
+            timestamp DateTime,
+            event_type String,
+            user_id String
+        ) ENGINE = MergeTree()
+        ORDER BY timestamp
+    `)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Insert data
+    stmt, err := db.Prepare("INSERT INTO events VALUES (?, ?, ?, ?)")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer stmt.Close()
+
+    _, err = stmt.Exec(1, "2023-01-01 12:00:00", "login", "user123")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Query data
+    rows, err := db.Query("SELECT * FROM events WHERE user_id = ?", "user123")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var id uint64
+        var timestamp, eventType, userID string
+        err := rows.Scan(&id, &timestamp, &eventType, &userID)
+        if err != nil {
+            log.Fatal(err)
+        }
+        log.Printf("Event: %d, %s, %s, %s", id, timestamp, eventType, userID)
+    }
+}
+----
+
+== Configuration
+
+[source,go]
+----
+config := &clickhouse.Config{
+    Host:     "localhost",     // ClickHouse host
+    Port:     "9000",          // ClickHouse port
+    Database: "default",       // Database name
+    User:     "default",       // Username
+    Password: "",              // Password
+    Debug:    true,            // Enable debug logging
+    Engines: &clickhouse.Engines{
+        Kafka: map[string]*clickhouse.KafkaEngine{
+            "events": {
+                BrokerList:   "localhost:9092",
+                TopicList:    "events",
+                GroupName:    "clickhouse_group",
+                NumConsumers: 1,
+            },
+        },
+    },
+}
+----
+
+== Kafka Engine Configuration
+
+[source,go]
+----
+kafkaEngine := &clickhouse.KafkaEngine{
+    BrokerList:   "broker1:9092,broker2:9092",
+    TopicList:    "events,logs",
+    GroupName:    "analytics_group",
+    NumConsumers: 3,
+}
+
+config.Engines = &clickhouse.Engines{
+    Kafka: map[string]*clickhouse.KafkaEngine{
+        "kafka_events": kafkaEngine,
+    },
+}
+----
+
+== Error Handling
+
+[source,go]
+----
+// Handle connection errors
+ch, err := clickhouse.Open(config, logger)
+if err != nil {
+    log.Printf("Failed to connect to ClickHouse: %v", err)
+    return
+}
+
+// Handle DB connection errors
+db, err := clickhouse.OpenDb(config, logger)
+if err != nil {
+    log.Printf("Failed to open DB connection: %v", err)
+    return
+}
+
+// Handle query errors
+rows, err := ch.Instance.Query(ctx, "SELECT * FROM table")
+if err != nil {
+    log.Printf("Query failed: %v", err)
+    return
+}
+----
+
+== Connection Management
+
+[source,go]
+----
+// Native connection
+ch, err := clickhouse.Open(config, logger)
+if err != nil {
+    log.Fatal(err)
+}
+defer ch.Close() // Automatic cleanup
+
+// Standard SQL connection
+db, err := clickhouse.OpenDb(config, logger)
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close() // Standard SQL cleanup
+----
+
+== Dependencies
+
+* `github.com/ClickHouse/clickhouse-go/v2` - ClickHouse Go driver
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+Both native ClickHouse connections and standard SQL DB connections are thread-safe and can be used concurrently from multiple goroutines.

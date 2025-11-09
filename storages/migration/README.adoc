@@ -1,0 +1,210 @@
+= Migration Package
+
+A Go library for database migrations using Goose, providing simple up/down migration management with support for PostgreSQL and ClickHouse databases, including advisory locking for safe concurrent execution.
+
+== Features
+
+* Database migration management using Goose
+* Support for PostgreSQL and ClickHouse databases
+* Up and down migration operations
+* Advisory locking for PostgreSQL (prevents concurrent migrations)
+* Automatic version tracking
+* Migration folder validation
+* Built-in logging and error handling
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/migration"
+----
+
+== Basic Usage
+
+=== Simple Migration Setup
+
+[source,go]
+----
+package main
+
+import (
+    "database/sql"
+    "log"
+
+    "gitlab.com/algmib/kit/migration"
+    _ "github.com/lib/pq"
+)
+
+func main() {
+    // Open database connection
+    db, err := sql.Open("postgres", "user=postgres dbname=myapp sslmode=disable")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // Create migration instance
+    mig := migration.NewMigration(
+        db,
+        "./migrations",                    // Migration files directory
+        logger,                           // Logger function
+        migration.DialectPostgres,        // Database dialect
+    )
+
+    // Apply all pending migrations
+    err = mig.Up()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Println("Migrations applied successfully")
+}
+----
+
+=== Migration with Rollback
+
+[source,go]
+----
+package main
+
+import (
+    "database/sql"
+    "log"
+    "os"
+
+    "gitlab.com/algmib/kit/migration"
+    _ "github.com/lib/pq"
+)
+
+func main() {
+    // Database connection
+    db, err := sql.Open("postgres", "user=postgres dbname=myapp sslmode=disable")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // Migration setup
+    mig := migration.NewMigration(
+        db,
+        "./db/migrations",
+        logger,
+        migration.DialectPostgres,
+    )
+
+    // Check command line argument
+    if len(os.Args) > 1 && os.Args[1] == "down" {
+        // Rollback last migration
+        log.Println("Rolling back last migration...")
+        err = mig.Down()
+        if err != nil {
+            log.Fatal(err)
+        }
+        log.Println("Migration rolled back successfully")
+    } else {
+        // Apply migrations
+        log.Println("Applying migrations...")
+        err = mig.Up()
+        if err != nil {
+            log.Fatal(err)
+        }
+        log.Println("Migrations applied successfully")
+    }
+}
+----
+
+== Supported Dialects
+
+[source,go]
+----
+// PostgreSQL
+mig := migration.NewMigration(db, "./migrations", logger, migration.DialectPostgres)
+
+// ClickHouse
+mig := migration.NewMigration(db, "./migrations", logger, migration.DialectClickHouse)
+----
+
+== Migration Files Structure
+
+Create migration files in your specified directory:
+
+[source,text]
+----
+migrations/
+├── 001_create_users_table.sql
+├── 002_add_email_index.sql
+└── 003_create_orders_table.sql
+----
+
+Example migration file (`001_create_users_table.sql`):
+[source,sql]
+----
+-- +goose Up
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- +goose Down
+DROP TABLE users;
+----
+
+== Error Handling
+
+[source,go]
+----
+// Handle migration errors
+err := mig.Up()
+if err != nil {
+    log.Printf("Migration failed: %v", err)
+
+    // You can try rolling back if needed
+    if rollbackErr := mig.Down(); rollbackErr != nil {
+        log.Printf("Rollback also failed: %v", rollbackErr)
+    }
+    return
+}
+
+// Handle database connection errors
+err = db.Ping()
+if err != nil {
+    log.Printf("Database connection failed: %v", err)
+    return
+}
+----
+
+== Migration Safety
+
+For PostgreSQL, the package uses advisory locking to prevent concurrent migration execution:
+
+[source,go]
+----
+// PostgreSQL automatically gets advisory lock during migrations
+// This prevents multiple instances from running migrations simultaneously
+
+// ClickHouse does not support advisory locking
+// Ensure only one instance runs migrations for ClickHouse
+----
+
+== Directory Validation
+
+[source,go]
+----
+// The migration will validate that the source directory exists
+mig := migration.NewMigration(db, "./nonexistent", logger, migration.DialectPostgres)
+
+err := mig.Up()
+// This will return an error if directory doesn't exist
+----
+
+== Dependencies
+
+* `github.com/pressly/goose/v3` - Migration tool
+* `github.com/lib/pq` - PostgreSQL driver
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+Migration operations use database-level locking (PostgreSQL) to ensure safe concurrent execution. Only one migration can run at a time per database.

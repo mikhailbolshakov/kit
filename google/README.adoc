@@ -1,0 +1,535 @@
+= Google Services Package
+
+A Go library for integrating with Google services including OAuth2 authentication and reCAPTCHA verification with built-in error handling and configuration management.
+
+== Features
+
+* **Google OAuth2**: Retrieve user information using Google OAuth2 tokens
+* **reCAPTCHA Verification**: Support for both reCAPTCHA v2 and v3 verification
+* **Flexible Configuration**: File-based or inline JSON configuration
+* **Built-in HTTP Client**: Configurable timeout and error handling
+* **Context-aware**: All operations support context for proper cancellation
+* **Error Codes**: Custom error codes for different failure scenarios
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/google"
+----
+
+== Configuration
+
+Configure Google services through the `Config` struct:
+
+[source,go]
+----
+type Config struct {
+    ConfigurationPath string  // Path to OAuth2 JSON configuration file
+    JsonConfiguration string  // Inline OAuth2 JSON configuration
+    ClientTimeout     int     // HTTP client timeout in seconds
+    ReCaptchaSecretV2 string  // reCAPTCHA v2 secret key
+    ReCaptchaSecretV3 string  // reCAPTCHA v3 secret key
+    ReCaptchaScore    float64 // Minimum score for reCAPTCHA v3 (0.0-1.0)
+}
+----
+
+== Google OAuth2
+
+Retrieve user information using Google OAuth2 access tokens.
+
+=== Setup
+
+[source,go]
+----
+// Using configuration file
+config := &google.Config{
+    ConfigurationPath: "./oauth2-credentials.json",
+    ClientTimeout:     30, // seconds
+}
+
+// Using inline configuration
+config := &google.Config{
+    JsonConfiguration: `{
+        "web": {
+            "client_id": "your-client-id.googleusercontent.com",
+            "client_secret": "your-client-secret",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token"
+        }
+    }`,
+    ClientTimeout: 30,
+}
+
+// Create OAuth2 client
+oauth, err := google.NewOAuth(config, logger)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== Get User Information
+
+[source,go]
+----
+// Get user info from OAuth2 token
+userInfo, err := oauth.GetGoogleUser(ctx, accessToken)
+if err != nil {
+    log.Printf("Failed to get user info: %v", err)
+    return
+}
+
+fmt.Printf("User ID: %s\n", userInfo.Id)
+fmt.Printf("Name: %s\n", userInfo.Name)
+fmt.Printf("Email: %s\n", userInfo.Email)
+fmt.Printf("Picture: %s\n", userInfo.Picture)
+fmt.Printf("Verified Email: %v\n", userInfo.VerifiedEmail)
+----
+
+== reCAPTCHA Verification
+
+Verify reCAPTCHA tokens from both v2 and v3 implementations.
+
+=== Setup
+
+[source,go]
+----
+config := &google.Config{
+    ReCaptchaSecretV2: "your-recaptcha-v2-secret",
+    ReCaptchaSecretV3: "your-recaptcha-v3-secret",
+    ReCaptchaScore:    0.5, // Minimum score for v3 (0.0-1.0)
+    ClientTimeout:     10,  // seconds
+}
+
+captcha := google.NewCaptcha(config, logger)
+----
+
+=== Verify reCAPTCHA v2
+
+[source,go]
+----
+// Verify reCAPTCHA v2 token
+request := &google.CaptchaRequest{
+    Captcha:  "recaptcha-token-from-client",
+    ClientIP: "192.168.1.100",
+    Version:  "v2",
+}
+
+valid, err := captcha.Verify(ctx, request)
+if err != nil {
+    log.Printf("reCAPTCHA verification error: %v", err)
+    return
+}
+
+if valid {
+    fmt.Println("reCAPTCHA verification successful")
+} else {
+    fmt.Println("reCAPTCHA verification failed")
+}
+----
+
+=== Verify reCAPTCHA v3
+
+[source,go]
+----
+// Verify reCAPTCHA v3 token (includes score checking)
+request := &google.CaptchaRequest{
+    Captcha:  "recaptcha-v3-token-from-client",
+    ClientIP: "192.168.1.100",
+    Version:  "v3",
+}
+
+valid, err := captcha.Verify(ctx, request)
+if err != nil {
+    log.Printf("reCAPTCHA v3 verification error: %v", err)
+    return
+}
+
+if valid {
+    fmt.Println("reCAPTCHA v3 verification successful (score >= threshold)")
+} else {
+    fmt.Println("reCAPTCHA v3 verification failed (score < threshold)")
+}
+----
+
+== Complete Examples
+
+=== Web Authentication Handler
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "log"
+
+    "gitlab.com/algmib/kit"
+    "gitlab.com/algmib/kit/google"
+)
+
+type AuthRequest struct {
+    AccessToken string `json:"access_token"`
+    Captcha     string `json:"captcha"`
+}
+
+type AuthResponse struct {
+    Success bool   `json:"success"`
+    User    *User  `json:"user,omitempty"`
+    Error   string `json:"error,omitempty"`
+}
+
+type User struct {
+    ID       string `json:"id"`
+    Name     string `json:"name"`
+    Email    string `json:"email"`
+    Picture  string `json:"picture"`
+    Verified bool   `json:"verified"`
+}
+
+func main() {
+    logger := kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+
+    // Configure Google services
+    config := &google.Config{
+        ConfigurationPath: "./oauth2-credentials.json",
+        ReCaptchaSecretV3: "your-recaptcha-v3-secret",
+        ReCaptchaScore:    0.5,
+        ClientTimeout:     30,
+    }
+
+    // Create clients
+    oauth, err := google.NewOAuth(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    captcha := google.NewCaptcha(config, logger)
+
+    // Setup HTTP handler
+    http.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request) {
+        handleAuth(w, r, oauth, captcha)
+    })
+
+    fmt.Println("Server starting on :8080")
+    log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func handleAuth(w http.ResponseWriter, r *http.Request, oauth google.OAuth2, captcha google.Captcha) {
+    if r.Method != http.MethodPost {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+
+    var req AuthRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        sendResponse(w, AuthResponse{
+            Success: false,
+            Error:   "Invalid JSON",
+        })
+        return
+    }
+
+    ctx := r.Context()
+
+    // Verify reCAPTCHA
+    captchaReq := &google.CaptchaRequest{
+        Captcha:  req.Captcha,
+        ClientIP: getClientIP(r),
+        Version:  "v3",
+    }
+
+    valid, err := captcha.Verify(ctx, captchaReq)
+    if err != nil {
+        log.Printf("Captcha error: %v", err)
+        sendResponse(w, AuthResponse{
+            Success: false,
+            Error:   "Captcha verification failed",
+        })
+        return
+    }
+
+    if !valid {
+        sendResponse(w, AuthResponse{
+            Success: false,
+            Error:   "Captcha validation failed",
+        })
+        return
+    }
+
+    // Get user information
+    userInfo, err := oauth.GetGoogleUser(ctx, req.AccessToken)
+    if err != nil {
+        log.Printf("OAuth error: %v", err)
+        sendResponse(w, AuthResponse{
+            Success: false,
+            Error:   "Failed to get user information",
+        })
+        return
+    }
+
+    // Success response
+    user := &User{
+        ID:       userInfo.Id,
+        Name:     userInfo.Name,
+        Email:    userInfo.Email,
+        Picture:  userInfo.Picture,
+        Verified: userInfo.VerifiedEmail,
+    }
+
+    sendResponse(w, AuthResponse{
+        Success: true,
+        User:    user,
+    })
+}
+
+func sendResponse(w http.ResponseWriter, resp AuthResponse) {
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(resp)
+}
+
+func getClientIP(r *http.Request) string {
+    // Check X-Forwarded-For header
+    forwarded := r.Header.Get("X-Forwarded-For")
+    if forwarded != "" {
+        return forwarded
+    }
+
+    // Check X-Real-IP header
+    realIP := r.Header.Get("X-Real-IP")
+    if realIP != "" {
+        return realIP
+    }
+
+    // Fall back to RemoteAddr
+    return r.RemoteAddr
+}
+----
+
+=== Contact Form with reCAPTCHA
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "log"
+
+    "gitlab.com/algmib/kit"
+    "gitlab.com/algmib/kit/google"
+)
+
+type ContactForm struct {
+    Name     string `json:"name"`
+    Email    string `json:"email"`
+    Message  string `json:"message"`
+    Captcha  string `json:"captcha"`
+}
+
+type ContactResponse struct {
+    Success bool   `json:"success"`
+    Message string `json:"message"`
+}
+
+func main() {
+    logger := kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+
+    config := &google.Config{
+        ReCaptchaSecretV2: "your-recaptcha-v2-secret",
+        ReCaptchaScore:    0.0, // Not used for v2
+        ClientTimeout:     15,
+    }
+
+    captcha := google.NewCaptcha(config, logger)
+
+    http.HandleFunc("/contact", func(w http.ResponseWriter, r *http.Request) {
+        handleContactForm(w, r, captcha)
+    })
+
+    fmt.Println("Contact form server starting on :8080")
+    log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func handleContactForm(w http.ResponseWriter, r *http.Request, captcha google.Captcha) {
+    if r.Method != http.MethodPost {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+
+    var form ContactForm
+    if err := json.NewDecoder(r.Body).Decode(&form); err != nil {
+        sendContactResponse(w, ContactResponse{
+            Success: false,
+            Message: "Invalid form data",
+        })
+        return
+    }
+
+    // Validate required fields
+    if form.Name == "" || form.Email == "" || form.Message == "" {
+        sendContactResponse(w, ContactResponse{
+            Success: false,
+            Message: "All fields are required",
+        })
+        return
+    }
+
+    ctx := r.Context()
+
+    // Verify reCAPTCHA v2
+    captchaReq := &google.CaptchaRequest{
+        Captcha:  form.Captcha,
+        ClientIP: getClientIP(r),
+        Version:  "v2",
+    }
+
+    valid, err := captcha.Verify(ctx, captchaReq)
+    if err != nil {
+        log.Printf("Captcha verification error: %v", err)
+        sendContactResponse(w, ContactResponse{
+            Success: false,
+            Message: "reCAPTCHA verification failed",
+        })
+        return
+    }
+
+    if !valid {
+        sendContactResponse(w, ContactResponse{
+            Success: false,
+            Message: "Please complete the reCAPTCHA",
+        })
+        return
+    }
+
+    // Process contact form (send email, save to database, etc.)
+    err = processContactForm(ctx, form)
+    if err != nil {
+        log.Printf("Error processing contact form: %v", err)
+        sendContactResponse(w, ContactResponse{
+            Success: false,
+            Message: "Failed to process form",
+        })
+        return
+    }
+
+    sendContactResponse(w, ContactResponse{
+        Success: true,
+        Message: "Thank you for your message!",
+    })
+}
+
+func sendContactResponse(w http.ResponseWriter, resp ContactResponse) {
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(resp)
+}
+
+func processContactForm(ctx context.Context, form ContactForm) error {
+    // Implement your form processing logic here
+    fmt.Printf("Processing contact form from %s (%s)\n", form.Name, form.Email)
+    fmt.Printf("Message: %s\n", form.Message)
+    return nil
+}
+----
+
+== Configuration Examples
+
+=== OAuth2 Credentials File
+
+[source,json]
+----
+{
+  "web": {
+    "client_id": "123456789-abcdefghijklmnop.googleusercontent.com",
+    "project_id": "my-project",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_secret": "your-client-secret",
+    "redirect_uris": [
+      "http://localhost:8080/auth/callback"
+    ]
+  }
+}
+----
+
+=== Environment-based Configuration
+
+[source,go]
+----
+config := &google.Config{
+    JsonConfiguration: os.Getenv("GOOGLE_OAUTH2_CONFIG"),
+    ReCaptchaSecretV2: os.Getenv("RECAPTCHA_SECRET_V2"),
+    ReCaptchaSecretV3: os.Getenv("RECAPTCHA_SECRET_V3"),
+    ReCaptchaScore:    0.5,
+    ClientTimeout:     30,
+}
+----
+
+== Error Handling
+
+The package provides custom error codes for different scenarios:
+
+=== OAuth2 Error Codes
+* `OAUTH-001`: OAuth configuration read error
+* `OAUTH-002`: OAuth service initialization error
+* `OAUTH-003`: Get user information error
+* `OAUTH-004`: Configuration file read error
+
+=== reCAPTCHA Error Codes
+* `CPT-001`: Unsupported reCAPTCHA version
+* `CPT-002`: HTTP request error
+* `CPT-003`: Response format error
+* `CPT-004`: HTTP response status error
+
+[source,go]
+----
+userInfo, err := oauth.GetGoogleUser(ctx, token)
+if err != nil {
+    // Handle specific error types
+    log.Printf("OAuth error: %v", err)
+
+    // You can check for specific error codes
+    if strings.Contains(err.Error(), "OAUTH-001") {
+        // Handle configuration error
+    }
+}
+----
+
+== Best Practices
+
+1. **Secure Secrets**: Store reCAPTCHA secrets and OAuth credentials securely
+2. **Timeout Configuration**: Set appropriate HTTP client timeouts
+3. **Error Handling**: Always handle errors and provide user-friendly messages
+4. **Score Thresholds**: Set reasonable reCAPTCHA v3 score thresholds (0.5 recommended)
+5. **IP Address**: Always provide accurate client IP addresses for reCAPTCHA
+6. **Context Usage**: Use context for proper cancellation and timeout handling
+7. **Rate Limiting**: Implement rate limiting for authentication endpoints
+
+== reCAPTCHA Score Guidelines
+
+For reCAPTCHA v3, scores range from 0.0 to 1.0:
+
+* **1.0**: Very likely a good interaction
+* **0.9**: Likely a good interaction
+* **0.7**: Probably a good interaction
+* **0.5**: Neutral (recommended threshold)
+* **0.3**: Probably a bad interaction
+* **0.1**: Very likely a bad interaction
+* **0.0**: Very likely a bot
+
+== Dependencies
+
+* Google OAuth2 libraries
+* Google APIs client library
+* ChatLab Kit utilities for logging and error handling
+
+== Thread Safety
+
+Both OAuth2 and Captcha clients are thread-safe and can be used concurrently from multiple goroutines.

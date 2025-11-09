@@ -1,0 +1,104 @@
+= Batch Worker Package
+
+A Go library for efficient batch processing of items. Collects items and processes them in batches based on time intervals or item counts.
+
+== Features
+
+* Generic batch processing for any data type
+* Time-based or count-based batch triggers
+* Non-blocking item submission
+* Context-aware with graceful shutdown
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/batch"
+----
+
+== Basic Usage
+
+=== 1. Implement Writer Interface
+
+[source,go]
+----
+type LogWriter struct{}
+
+func (w *LogWriter) Write(ctx context.Context, items []*LogEntry) error {
+    // Process your batch here
+    fmt.Printf("Processing %d items\n", len(items))
+    return nil
+}
+----
+
+=== 2. Configure and Start Worker
+
+[source,go]
+----
+options := &batch.Options{
+    Interval:    5 * time.Second,  // Process every 5 seconds
+    MaxItems:    100,              // Or when 100 items collected
+    MaxCapacity: 1000,             // Channel buffer size
+}
+
+writer := &LogWriter{}
+worker := batch.NewBatchWorker[LogEntry](writer, options, logger)
+
+// Start the worker
+worker.Start(ctx)
+defer worker.Close(ctx)
+----
+
+=== 3. Submit Items
+
+[source,go]
+----
+// Submit items for batch processing
+for i := 0; i < 50; i++ {
+    item := &LogEntry{
+        Message: fmt.Sprintf("Log %d", i),
+        Time:    time.Now(),
+    }
+    worker.Write(ctx, item)
+}
+----
+
+== Configuration
+
+[source,go]
+----
+type Options struct {
+    Interval    time.Duration  // Time trigger for batching
+    MaxItems    int            // Count trigger for batching
+    MaxCapacity int            // Channel buffer size
+}
+----
+
+== Common Configurations
+
+[source,go]
+----
+// Fast processing (low latency)
+&batch.Options{
+    Interval:    1 * time.Second,
+    MaxItems:    10,
+    MaxCapacity: 100,
+}
+
+// Bulk processing (high throughput)
+&batch.Options{
+    Interval:    30 * time.Second,
+    MaxItems:    1000,
+    MaxCapacity: 5000,
+}
+----
+
+== Batch Triggers
+
+Batches are processed when **either** condition is met:
+- Time interval expires (`Interval`)
+- Item count reaches limit (`MaxItems`)
+
+== Thread Safety
+
+The worker is thread-safe - multiple goroutines can call `Write()` concurrently.

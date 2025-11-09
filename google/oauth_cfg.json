@@ -1,0 +1,12 @@
+{
+  "web": {
+    "client_id": "407408718192.apps.googleusercontent.com",
+    "client_secret": "",
+    "redirect_uris": [
+      "https://google.com"
+    ],
+    "auth_uri": "",
+    "token_uri": ""
+  },
+  "installed": null
+}

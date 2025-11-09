@@ -1,0 +1,226 @@
+
+= Aerospike Package
+
+A Go library for Aerospike database connectivity, providing simple connection management, key generation, and client instance access with built-in logging and error handling.
+
+== Features
+
+* Aerospike database connection management
+* Automatic reconnection support
+* Connection pooling configuration
+* Key generation utilities
+* Built-in logging integration
+* Context-aware operations
+* Error handling with custom error types
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/aerospike"
+----
+
+== Basic Usage
+
+=== Simple Connection Setup
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+
+    "gitlab.com/algmib/kit/aerospike"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Create Aerospike instance
+    aero := aerospike.New()
+
+    // Configure connection
+    config := &aerospike.Config{
+        Host:     "localhost",
+        Port:     3000,
+        Username: "admin",
+        Password: "password",
+    }
+
+    // Open connection
+    err := aero.Open(ctx, config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer aero.Close(ctx)
+
+    // Get client instance for operations
+    client := aero.Instance()
+
+    // Create key
+    key, err := aero.GetKey(ctx, "test", "user:123")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Use client for database operations
+    policy := aerospike.NewWritePolicy(0, 0)
+    bins := aerospike.BinMap{
+        "name":  "John Doe",
+        "email": "john@example.com",
+    }
+
+    err = client.Put(policy, key, bins)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Println("Data stored successfully")
+}
+----
+
+=== Database Operations with Reconnection
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+
+    "gitlab.com/algmib/kit/aerospike"
+)
+
+type UserData struct {
+    ID    string `json:"id"`
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+func main() {
+    ctx := context.Background()
+
+    aero := aerospike.New()
+
+    config := &aerospike.Config{
+        Host: "localhost",
+        Port: 3000,
+    }
+
+    err := aero.Open(ctx, config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer aero.Close(ctx)
+
+    // Perform database operations
+    client := aero.Instance()
+
+    // Create user record
+    userData := UserData{
+        ID:    "user123",
+        Name:  "Jane Smith",
+        Email: "jane@example.com",
+    }
+
+    // Generate key
+    key, err := aero.GetKey(ctx, "users", userData.ID)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Store data
+    bins := aerospike.BinMap{
+        "name":  userData.Name,
+        "email": userData.Email,
+    }
+
+    err = client.Put(nil, key, bins)
+    if err != nil {
+        // Try to reconnect on error
+        if reconnErr := aero.Reconnect(ctx); reconnErr != nil {
+            log.Printf("Reconnection failed: %v", reconnErr)
+        }
+        log.Fatal(err)
+    }
+
+    // Read data back
+    record, err := client.Get(nil, key)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    if record != nil {
+        log.Printf("Retrieved: name=%s, email=%s",
+            record.Bins["name"], record.Bins["email"])
+    }
+}
+----
+
+== Configuration
+
+[source,go]
+----
+config := &aerospike.Config{
+    Host:     "localhost",  // Aerospike host
+    Port:     3000,         // Aerospike port
+    Username: "admin",      // Username (optional)
+    Password: "password",   // Password (optional)
+}
+----
+
+== Error Handling
+
+[source,go]
+----
+// Handle connection errors
+err := aero.Open(ctx, config, logger)
+if err != nil {
+    log.Printf("Failed to connect to Aerospike: %v", err)
+    return
+}
+
+// Handle key creation errors
+key, err := aero.GetKey(ctx, "namespace", "key")
+if err != nil {
+    log.Printf("Failed to create key: %v", err)
+    return
+}
+
+// Handle reconnection
+if !client.IsConnected() {
+    err := aero.Reconnect(ctx)
+    if err != nil {
+        log.Printf("Reconnection failed: %v", err)
+    }
+}
+----
+
+== Connection Management
+
+[source,go]
+----
+// Check connection status
+client := aero.Instance()
+if client.IsConnected() {
+    // Perform operations
+}
+
+// Manually reconnect if needed
+err := aero.Reconnect(ctx)
+if err != nil {
+    log.Printf("Reconnection error: %v", err)
+}
+----
+
+== Dependencies
+
+* `github.com/aerospike/aerospike-client-go/v7` - Aerospike Go client
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+The Aerospike client is thread-safe and can be used concurrently from multiple goroutines.

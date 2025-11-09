@@ -1,0 +1,333 @@
+
+= Kit Error Handling
+
+A Go library providing structured application error handling with support for error types, HTTP/gRPC status codes, contextual information, and field attachments for comprehensive error tracking and debugging.
+
+== Features
+
+* Structured application errors with codes and types
+* HTTP and gRPC status code integration
+* Context-aware error creation with request information
+* Field attachments for additional error metadata
+* Error wrapping with cause preservation
+* Stack trace support for debugging
+* Business, system, and panic error categorization
+* Builder pattern for flexible error construction
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit"
+----
+
+== Basic Usage
+
+=== Simple Error Creation
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+    "net/http"
+
+    "gitlab.com/algmib/kit"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Create simple business error
+    err := kit.NewAppErrBuilder("USR-001", "user not found").
+        Business().
+        HttpSt(http.StatusNotFound).
+        Err()
+
+    log.Printf("Error: %v", err)
+
+    // Check if error is an AppError
+    if appErr, ok := kit.IsAppErr(err); ok {
+        log.Printf("Error Code: %s", appErr.Code())
+        log.Printf("Error Type: %s", appErr.Type())
+        log.Printf("HTTP Status: %d", *appErr.HttpStatus())
+    }
+
+    // Create system error with context and fields
+    systemErr := kit.NewAppErrBuilder("DB-001", "database connection failed").
+        C(ctx).
+        F(kit.KV{
+            "database": "users",
+            "host":     "localhost:5432",
+            "timeout":  "30s",
+        }).
+        System().
+        HttpSt(http.StatusInternalServerError).
+        Err()
+
+    if appErr, ok := kit.IsAppErr(systemErr); ok {
+        log.Printf("System Error: %s", appErr.Code())
+        log.Printf("Fields: %+v", appErr.Fields())
+    }
+}
+----
+
+=== Advanced Error Handling with Wrapping
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "database/sql"
+    "fmt"
+    "log"
+    "net/http"
+
+    "gitlab.com/algmib/kit"
+)
+
+type UserService struct {
+    db *sql.DB
+}
+
+func (s *UserService) GetUser(ctx context.Context, userID string) (*User, error) {
+    // Simulate database query
+    user, err := s.queryUser(ctx, userID)
+    if err != nil {
+        // Wrap the database error with application context
+        return nil, kit.NewAppErrBuilder("USR-002", "failed to retrieve user").
+            C(ctx).
+            F(kit.KV{
+                "user_id":   userID,
+                "operation": "get_user",
+                "layer":     "service",
+            }).
+            HttpSt(http.StatusInternalServerError).
+            Wrap(err).
+            Err()
+    }
+
+    if user == nil {
+        return nil, kit.NewAppErrBuilder("USR-001", "user not found").
+            C(ctx).
+            F(kit.KV{"user_id": userID}).
+            Business().
+            HttpSt(http.StatusNotFound).
+            Err()
+    }
+
+    return user, nil
+}
+
+func (s *UserService) queryUser(ctx context.Context, userID string) (*User, error) {
+    // Simulate database error
+    return nil, fmt.Errorf("connection timeout")
+}
+
+type User struct {
+    ID   string
+    Name string
+}
+
+func handleGetUser(service *UserService) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        userID := r.URL.Query().Get("id")
+
+        user, err := service.GetUser(r.Context(), userID)
+        if err != nil {
+            handleError(w, err)
+            return
+        }
+
+        // Return user data
+        fmt.Fprintf(w, "User: %+v", user)
+    }
+}
+
+func handleError(w http.ResponseWriter, err error) {
+    if appErr, ok := kit.IsAppErr(err); ok {
+        // Use the HTTP status from the error
+        status := http.StatusInternalServerError
+        if appErr.HttpStatus() != nil {
+            status = int(*appErr.HttpStatus())
+        }
+
+        // Log error with full context
+        log.Printf("Application Error [%s]: %s, Fields: %+v",
+            appErr.Code(), appErr.Message(), appErr.Fields())
+
+        // For debugging, you can also log with stack trace
+        if appErr.Type() == kit.ErrTypeSystem {
+            log.Printf("Stack trace: %s", appErr.WithStack())
+        }
+
+        // Return appropriate HTTP response
+        http.Error(w, fmt.Sprintf("Error: %s", appErr.Code()), status)
+    } else {
+        // Handle regular errors
+        log.Printf("Unexpected error: %v", err)
+        http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+    }
+}
+
+func main() {
+    service := &UserService{} // Initialize with actual DB
+
+    http.HandleFunc("/user", handleGetUser(service))
+
+    log.Println("Server starting on :8080")
+    log.Fatal(http.ListenAndServe(":8080", nil))
+}
+----
+
+== Error Types
+
+[source,go]
+----
+// Business errors (validation, not found, etc.)
+businessErr := kit.NewAppErrBuilder("VAL-001", "invalid email format").
+    Business().
+    HttpSt(http.StatusBadRequest).
+    Err()
+
+// System errors (database, network, etc.)
+systemErr := kit.NewAppErrBuilder("SYS-001", "database connection failed").
+    System().
+    HttpSt(http.StatusInternalServerError).
+    Err()
+
+// Panic errors (recovered panics)
+panicErr := kit.ErrPanic(ctx, "unexpected nil pointer")
+----
+
+== Error Code Patterns
+
+[source,go]
+----
+// User-related errors
+const (
+    ErrCodeUserNotFound     = "USR-001"
+    ErrCodeUserExists       = "USR-002"
+    ErrCodeInvalidUserData  = "USR-003"
+)
+
+// Database errors
+const (
+    ErrCodeDbConnection    = "DB-001"
+    ErrCodeDbQuery        = "DB-002"
+    ErrCodeDbTransaction  = "DB-003"
+)
+
+// Validation errors
+const (
+    ErrCodeValidationFailed  = "VAL-001"
+    ErrCodeMissingField     = "VAL-002"
+    ErrCodeInvalidFormat    = "VAL-003"
+)
+----
+
+== Context Integration
+
+[source,go]
+----
+// Error with request context
+err := kit.NewAppErrBuilder("API-001", "request processing failed").
+    C(ctx). // Automatically extracts request ID, user ID, etc.
+    F(kit.KV{
+        "endpoint": "/api/users",
+        "method":   "POST",
+    }).
+    Err()
+
+// Check for specific error codes
+if kit.IsAppErrCode(err, "API-001") {
+    log.Println("API processing error detected")
+}
+----
+
+== gRPC Integration
+
+[source,go]
+----
+import "google.golang.org/grpc/codes"
+
+// Error with gRPC status
+grpcErr := kit.NewAppErrBuilder("GRP-001", "service unavailable").
+    GrpcSt(uint32(codes.Unavailable)).
+    HttpSt(http.StatusServiceUnavailable).
+    Err()
+----
+
+== Error Inspection
+
+[source,go]
+----
+if appErr, ok := kit.IsAppErr(err); ok {
+    fmt.Printf("Code: %s\n", appErr.Code())
+    fmt.Printf("Message: %s\n", appErr.Message())
+    fmt.Printf("Type: %s\n", appErr.Type())
+    fmt.Printf("Fields: %+v\n", appErr.Fields())
+
+    if appErr.HttpStatus() != nil {
+        fmt.Printf("HTTP Status: %d\n", *appErr.HttpStatus())
+    }
+
+    if appErr.GrpcStatus() != nil {
+        fmt.Printf("gRPC Status: %d\n", *appErr.GrpcStatus())
+    }
+
+    if cause := appErr.Cause(); cause != nil {
+        fmt.Printf("Caused by: %v\n", cause)
+    }
+
+    // Get error with stack trace for logging
+    stackErr := appErr.WithStackErr()
+    fmt.Printf("With stack: %v\n", stackErr)
+}
+----
+
+== Best Practices
+
+[source,go]
+----
+// 1. Use consistent error codes
+const ErrCodeUserNotFound = "USR-001"
+
+// 2. Include relevant context
+err := kit.NewAppErrBuilder(ErrCodeUserNotFound, "user not found").
+    C(ctx).
+    F(kit.KV{"user_id": userID, "operation": "get_user"}).
+    Business().
+    HttpSt(http.StatusNotFound).
+    Err()
+
+// 3. Wrap lower-level errors
+dbErr := database.Query(sql)
+if dbErr != nil {
+    return kit.NewAppErrBuilder("DB-001", "query failed").
+        Wrap(dbErr).
+        Err()
+}
+
+// 4. Check error types appropriately
+if appErr, ok := kit.IsAppErr(err); ok {
+    if appErr.Type() == kit.ErrTypeBusiness {
+        // Handle business logic errors
+    } else {
+        // Handle system errors
+    }
+}
+----
+
+== Dependencies
+
+* `github.com/pkg/errors` - Error wrapping and stack traces
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+Error creation and inspection functions are thread-safe and can be used concurrently from multiple goroutines.

@@ -1,0 +1,289 @@
+= Goroutine Package
+
+A Go library providing enhanced goroutine management with panic recovery, retry mechanisms, and error group functionality for robust concurrent programming.
+
+== Features
+
+* **Panic Recovery**: Automatic panic recovery with logging and stack traces
+* **Retry Mechanism**: Configurable retry logic with custom delays
+* **Error Groups**: Coordinated goroutine execution with error handling
+* **Flexible Logging**: Support for both prepared loggers and logger functions
+* **Context Support**: Full context awareness for cancellation and timeouts
+* **Unrestricted Retries**: Option for unlimited retry attempts
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/goroutine"
+----
+
+== Basic Goroutine Wrapper
+
+Enhanced goroutine execution with panic recovery and retry support.
+
+=== Simple Usage
+
+[source,go]
+----
+// Basic goroutine with logger
+goroutine.New().
+    WithLoggerFn(logger).
+    Cmp("worker").
+    Mth("process").
+    Go(ctx, func() {
+        // Your concurrent work here
+        fmt.Println("Processing data...")
+    })
+----
+
+=== With Retry Logic
+
+[source,go]
+----
+// Goroutine with retry on panic
+goroutine.New().
+    WithLoggerFn(logger).
+    WithRetry(3).                           // Retry up to 3 times
+    WithRetryDelay(2 * time.Second).        // 2 second delay between retries
+    Cmp("api-client").
+    Mth("fetch-data").
+    Go(ctx, func() {
+        // Code that might panic
+        data := fetchFromAPI()
+        processData(data)
+    })
+----
+
+=== Unlimited Retries
+
+[source,go]
+----
+// Goroutine with unlimited retries
+goroutine.New().
+    WithLoggerFn(logger).
+    WithRetry(goroutine.Unrestricted).      // Unlimited retries
+    WithRetryDelay(5 * time.Second).
+    Cmp("health-checker").
+    Go(ctx, func() {
+        // Critical service that should always retry
+        performHealthCheck()
+    })
+----
+
+== Error Groups
+
+Coordinated execution of multiple goroutines with error propagation and cancellation.
+
+=== Basic Error Group
+
+[source,go]
+----
+// Create error group
+group := goroutine.NewGroup(ctx).
+    WithLoggerFn(logger).
+    Cmp("batch-processor")
+
+// Add multiple goroutines
+group.Go(func() error {
+    return processFile("file1.txt")
+})
+
+group.Go(func() error {
+    return processFile("file2.txt")
+})
+
+group.Go(func() error {
+    return processFile("file3.txt")
+})
+
+// Wait for all to complete or first error
+if err := group.Wait(); err != nil {
+    log.Printf("Processing failed: %v", err)
+}
+----
+
+=== With Manual Cancellation
+
+[source,go]
+----
+group := goroutine.NewGroup(ctx).WithLoggerFn(logger)
+
+// Add work
+group.Go(func() error {
+    return longRunningTask1()
+})
+
+group.Go(func() error {
+    return longRunningTask2()
+})
+
+// Cancel after timeout
+go func() {
+    time.Sleep(30 * time.Second)
+    group.Cancel() // Cancel all running goroutines
+}()
+
+err := group.Wait()
+if err != nil {
+    log.Printf("Group execution failed: %v", err)
+}
+----
+
+== Examples
+
+=== Web Scraper with Retry
+
+[source,go]
+----
+urls := []string{
+    "https://example.com/api/data1",
+    "https://example.com/api/data2",
+    "https://example.com/api/data3",
+}
+
+for i, url := range urls {
+    url := url // Capture for closure
+
+    goroutine.New().
+        WithLoggerFn(logger).
+        WithRetry(5).
+        WithRetryDelay(3 * time.Second).
+        Cmp("scraper").
+        Go(ctx, func() {
+            resp, err := http.Get(url)
+            if err != nil {
+                panic(fmt.Sprintf("Failed to fetch %s: %v", url, err))
+            }
+            defer resp.Body.Close()
+
+            fmt.Printf("Successfully fetched: %s\n", url)
+        })
+}
+----
+
+=== Parallel Data Processing
+
+[source,go]
+----
+items := []string{"task1", "task2", "task3", "task4", "task5"}
+
+group := goroutine.NewGroup(ctx).
+    WithLoggerFn(logger).
+    Cmp("data-processor")
+
+for _, item := range items {
+    item := item // Capture for closure
+
+    group.Go(func() error {
+        // Simulate processing
+        time.Sleep(time.Second)
+        fmt.Printf("Processed: %s\n", item)
+        return nil
+    })
+}
+
+if err := group.Wait(); err != nil {
+    log.Printf("Processing failed: %v", err)
+}
+----
+
+=== Background Service
+
+[source,go]
+----
+goroutine.New().
+    WithLoggerFn(logger).
+    WithRetry(goroutine.Unrestricted).
+    WithRetryDelay(5 * time.Second).
+    Cmp("health-monitor").
+    Go(ctx, func() {
+        for {
+            select {
+            case <-ctx.Done():
+                return
+            default:
+                performHealthCheck()
+                time.Sleep(30 * time.Second)
+            }
+        }
+    })
+----
+
+== Configuration Options
+
+=== Goroutine Options
+
+[source,go]
+----
+g := goroutine.New().
+    WithLoggerFn(loggerFunc).               // Logger function
+    WithLogger(preparedLogger).             // Prepared logger instance
+    WithRetry(5).                           // Retry count (or Unrestricted)
+    WithRetryDelay(2 * time.Second).        // Delay between retries
+    Cmp("component-name").                  // Component name for logging
+    Mth("method-name")                      // Method name for logging
+----
+
+=== Error Group Options
+
+[source,go]
+----
+group := goroutine.NewGroup(ctx).
+    WithLoggerFn(loggerFunc).               // Logger function
+    WithLogger(preparedLogger).             // Prepared logger instance
+    Cmp("component-name").                  // Component name for logging
+    Mth("method-name")                      // Method name for logging
+----
+
+== Error Handling
+
+The package provides comprehensive error handling:
+
+[source,go]
+----
+// Panics are automatically recovered and logged
+goroutine.New().WithLoggerFn(logger).Go(ctx, func() {
+    panic("Something went wrong") // Will be caught and logged
+})
+
+// Error groups propagate first error
+group := goroutine.NewGroup(ctx).WithLoggerFn(logger)
+
+group.Go(func() error {
+    return fmt.Errorf("first error")  // This will cancel other goroutines
+})
+
+group.Go(func() error {
+    time.Sleep(10 * time.Second)      // Won't complete due to cancellation
+    return nil
+})
+
+err := group.Wait() // Returns "first error"
+----
+
+== Best Practices
+
+1. **Always Provide Logger**: Both Goroutine and ErrGroup require a logger
+2. **Use Context**: Pass context for proper cancellation support
+3. **Capture Loop Variables**: Use closure variable capture in loops
+4. **Handle Panics Gracefully**: Let the wrapper handle panics; focus on business logic
+5. **Set Reasonable Retry Counts**: Avoid infinite loops with unlimited retries
+6. **Use Error Groups for Related Work**: Group related goroutines that should fail together
+7. **Implement Timeouts**: Use context timeouts for long-running operations
+
+== Constants
+
+[source,go]
+----
+goroutine.RetryDelay      // Default retry delay (1 second)
+goroutine.Unrestricted    // Unlimited retry attempts (-1)
+----
+
+== Dependencies
+
+* ChatLab Kit utilities for logging and context management
+
+== Thread Safety
+
+Both Goroutine wrapper and ErrGroup are thread-safe and designed for concurrent use.

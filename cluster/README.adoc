@@ -1,0 +1,362 @@
+= Service Cluster Package
+
+A Go framework for building microservices with built-in CLI support, database migrations, configuration management, and lifecycle handling.
+
+== Features
+
+* Generic service framework with lifecycle management
+* CLI interface with Cobra commands
+* Database migration support (PostgreSQL & ClickHouse)
+* Configuration loading from files and environment variables
+* Graceful shutdown handling
+* Built-in logging and error handling
+* Bootstrap interface for custom service initialization
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/cluster"
+----
+
+== Basic Usage
+
+=== 1. Implement Bootstrap Interface
+
+[source,go]
+----
+type MyService struct {
+    // Your service dependencies
+}
+
+func (s *MyService) Init(ctx context.Context, cfg any) error {
+    // Initialize your service (databases, clients, etc.)
+    return nil
+}
+
+func (s *MyService) Start(ctx context.Context) error {
+    // Start background processes, HTTP servers, etc.
+    return nil
+}
+
+func (s *MyService) Close(ctx context.Context) {
+    // Clean up resources
+}
+----
+
+=== 2. Create and Configure Service
+
+[source,go]
+----
+type Config struct {
+    Database struct {
+        Host     string `mapstructure:"host"`
+        Port     int    `mapstructure:"port"`
+        User     string `mapstructure:"user"`
+        Password string `mapstructure:"password"`
+        DBName   string `mapstructure:"db_name"`
+    } `mapstructure:"database"`
+}
+
+func main() {
+    service := &MyService{}
+
+    // Create service instance
+    instance := cluster.New[Config]("my-service", service)
+
+    // Optional: Configure environment variables
+    instance.WithConfigPathEnv("CONFIG_PATH")
+    instance.WithMigrationSourceEnv("MIGRATION_PATH")
+
+    // Execute CLI
+    if err := instance.Execute(); err != nil {
+        log.Fatal(err)
+    }
+}
+----
+
+== Commands
+
+=== Application Command
+Run the main service:
+[source,bash]
+----
+./my-service app --config ./config.yml
+----
+
+=== Database Migrations
+
+==== PostgreSQL Migrations
+Add PostgreSQL migration support:
+
+[source,go]
+----
+instance.WithDbMigration(func(cfg *Config) (any, error) {
+    return &kitStorage.DbConfig{
+        Host:     cfg.Database.Host,
+        Port:     cfg.Database.Port,
+        User:     cfg.Database.User,
+        Password: cfg.Database.Password,
+        Database: cfg.Database.DBName,
+    }, nil
+})
+----
+
+Run migrations:
+[source,bash]
+----
+# Run up migrations
+./my-service db-up --config ./config.yml --source ./migrations
+
+# Run down migrations
+./my-service db-down --config ./config.yml --source ./migrations
+----
+
+==== ClickHouse Migrations
+Add ClickHouse migration support:
+
+[source,go]
+----
+instance.WithClickHouseMigration(func(cfg *Config) (any, error) {
+    return &clickhouse.Config{
+        Host:     cfg.ClickHouse.Host,
+        Port:     cfg.ClickHouse.Port,
+        User:     cfg.ClickHouse.User,
+        Password: cfg.ClickHouse.Password,
+        Database: cfg.ClickHouse.Database,
+    }, nil
+})
+----
+
+Run ClickHouse migrations:
+[source,bash]
+----
+# Run up migrations
+./my-service ch-up --source ./ch-migrations
+
+# Run down migrations
+./my-service ch-down --source ./ch-migrations
+
+# With parameterized scripts (config substitution)
+./my-service ch-up --source ./ch-migrations --parameterized true
+----
+
+== Configuration
+
+=== Configuration Loading
+The service loads configuration in this priority order:
+1. Environment variable (if specified with `WithConfigPathEnv`)
+2. Command line flag `--config`
+3. Default path: `./config.yml`
+
+=== Example Configuration File
+[source,yaml]
+----
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: secret
+  db_name: myapp
+
+clickhouse:
+  host: localhost
+  port: 9000
+  user: default
+  password: ""
+  database: analytics
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+----
+
+== Migration Management
+
+=== Migration File Structure
+[source,text]
+----
+migrations/
+├── pg/                     # PostgreSQL migrations
+│   ├── 001_initial.up.sql
+│   ├── 001_initial.down.sql
+│   ├── 002_users.up.sql
+│   └── 002_users.down.sql
+└── click/                  # ClickHouse migrations
+    ├── 001_events.up.sql
+    ├── 001_events.down.sql
+    └── 002_analytics.up.sql
+----
+
+=== Schema-specific Migrations
+For multi-tenant or multi-schema setups:
+
+[source,bash]
+----
+# Specify schema/user with colon separator
+./my-service db-up --source tenant1:./migrations/tenant1 --source tenant2:./migrations/tenant2
+----
+
+=== Parameterized Migrations
+Use configuration substitution in ClickHouse migrations:
+
+[source,sql]
+----
+-- migration file with placeholders
+CREATE TABLE events (
+    id UUID,
+    tenant_id String DEFAULT '{{clickhouse_default_tenant}}'
+) ENGINE = MergeTree()
+ORDER BY id;
+----
+
+Run with parameterization:
+[source,bash]
+----
+./my-service ch-up --source ./migrations --parameterized true
+----
+
+== Complete Example
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+    "net/http"
+
+    "gitlab.com/algmib/kit/cluster"
+    kitStorage "gitlab.com/algmib/kit/storages/pg"
+    "gitlab.com/algmib/kit/storages/clickhouse"
+)
+
+type Config struct {
+    Server struct {
+        Port string `mapstructure:"port"`
+    } `mapstructure:"server"`
+
+    Database struct {
+        Host     string `mapstructure:"host"`
+        Port     int    `mapstructure:"port"`
+        User     string `mapstructure:"user"`
+        Password string `mapstructure:"password"`
+        DBName   string `mapstructure:"db_name"`
+    } `mapstructure:"database"`
+
+    ClickHouse clickhouse.Config `mapstructure:"clickhouse"`
+}
+
+type WebService struct {
+    config *Config
+    server *http.Server
+}
+
+func (s *WebService) Init(ctx context.Context, cfg any) error {
+    s.config = cfg.(*Config)
+
+    // Initialize your dependencies here
+    // - Database connections
+    // - External clients
+    // - Business logic components
+
+    return nil
+}
+
+func (s *WebService) Start(ctx context.Context) error {
+    // Start HTTP server
+    mux := http.NewServeMux()
+    mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte("OK"))
+    })
+
+    s.server = &http.Server{
+        Addr:    ":" + s.config.Server.Port,
+        Handler: mux,
+    }
+
+    go func() {
+        if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Printf("HTTP server error: %v", err)
+        }
+    }()
+
+    return nil
+}
+
+func (s *WebService) Close(ctx context.Context) {
+    if s.server != nil {
+        s.server.Shutdown(ctx)
+    }
+}
+
+func main() {
+    service := &WebService{}
+
+    instance := cluster.New[Config]("web-service", service).
+        WithConfigPathEnv("CONFIG_PATH").
+        WithMigrationSourceEnv("MIGRATION_PATH").
+        WithDbMigration(func(cfg *Config) (any, error) {
+            return &kitStorage.DbConfig{
+                Host:     cfg.Database.Host,
+                Port:     cfg.Database.Port,
+                User:     cfg.Database.User,
+                Password: cfg.Database.Password,
+                Database: cfg.Database.DBName,
+            }, nil
+        }).
+        WithClickHouseMigration(func(cfg *Config) (any, error) {
+            return &cfg.ClickHouse, nil
+        })
+
+    if err := instance.Execute(); err != nil {
+        log.Fatal(err)
+    }
+}
+----
+
+== Environment Variables
+
+[source,bash]
+----
+# Configuration
+export CONFIG_PATH=/etc/myservice/config.yml
+
+# Migration sources
+export MIGRATION_PATH=/etc/myservice/migrations
+
+# Multiple sources (comma-separated)
+export MIGRATION_PATH="tenant1:/migrations/tenant1,tenant2:/migrations/tenant2"
+----
+
+== Best Practices
+
+1. **Configuration Structure**: Use nested structs with `mapstructure` tags for clean config organization
+2. **Graceful Shutdown**: Implement proper cleanup in the `Close()` method
+3. **Error Handling**: Return meaningful errors from `Init()` and `Start()` methods
+4. **Migration Naming**: Use numbered prefixes for migration files (001_, 002_, etc.)
+5. **Environment Variables**: Use environment variables for deployment-specific configuration
+6. **Health Checks**: Implement health check endpoints in your service
+7. **Logging**: Use the provided logger for consistent logging across the service
+
+== Error Codes
+
+The package defines specific error codes for different failure scenarios:
+
+* `SVS-001`: Config path not specified
+* `SVS-002`: Migration source path invalid
+* `SVS-003`: Migration source parameter invalid
+* `SVS-004`: ClickHouse config invalid
+* `SVS-005`: PostgreSQL config invalid
+
+== Dependencies
+
+* Cobra CLI framework
+* ChatLab Kit utilities for logging and configuration
+* Database drivers for PostgreSQL and ClickHouse
+
+== Thread Safety
+
+The service instance is designed to be used in the main goroutine for CLI execution. The Bootstrap implementation should handle thread safety for concurrent operations.

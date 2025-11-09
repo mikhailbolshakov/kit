@@ -1,0 +1,307 @@
+= Redis Package
+
+A Go library for Redis connectivity and operations, providing simple connection management, distributed locking, priority queues, and standard Redis operations with built-in logging and error handling.
+
+== Features
+
+* Redis connection management with authentication support
+* Distributed locking with TTL and unique release IDs
+* Priority queue implementation using Redis sorted sets
+* Standard Redis operations through go-redis client
+* Context-aware operations
+* Built-in logging and error handling
+* Connection health checking with ping
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/redis"
+----
+
+== Basic Usage
+
+=== Simple Connection and Operations
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+
+    "gitlab.com/algmib/kit/redis"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Configure Redis connection
+    config := &redis.Config{
+        Host:     "localhost",
+        Port:     "6379",
+        Username: "",
+        Password: "",
+        Db:       0,
+        Ttl:      3600, // Default TTL in seconds
+    }
+
+    // Open connection
+    r, err := redis.Open(ctx, config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer r.Close()
+
+    // Use Redis client for basic operations
+    client := r.Instance
+
+    // Set a key with TTL
+    err = client.Set(ctx, "user:123", "John Doe", r.Ttl).Err()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Get value
+    val, err := client.Get(ctx, "user:123").Result()
+    if err != nil {
+        if err == redis.NotFound {
+            log.Println("Key not found")
+        } else {
+            log.Fatal(err)
+        }
+    } else {
+        log.Printf("User: %s", val)
+    }
+
+    // Check if key exists
+    exists, err := client.Exists(ctx, "user:123").Result()
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Printf("Key exists: %t", exists > 0)
+}
+----
+
+=== Distributed Locking and Priority Queue
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "gitlab.com/algmib/kit/redis"
+)
+
+type Task struct {
+    ID          string `json:"id"`
+    Description string `json:"description"`
+    UserID      string `json:"user_id"`
+}
+
+func main() {
+    ctx := context.Background()
+
+    config := &redis.Config{
+        Host: "localhost",
+        Port: "6379",
+        Db:   0,
+        Ttl:  300, // 5 minutes default TTL
+    }
+
+    r, err := redis.Open(ctx, config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer r.Close()
+
+    // Distributed Locking Example
+    lockKey := "process:user:123"
+    releaseID := "worker-1-" + fmt.Sprint(time.Now().Unix())
+    lockTTL := 30 * time.Second
+
+    // Try to acquire lock
+    locked, err := r.Lock(ctx, lockKey, releaseID, lockTTL)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    if locked {
+        log.Println("Lock acquired, processing user data...")
+
+        // Simulate work
+        time.Sleep(2 * time.Second)
+
+        // Release lock
+        unlocked, err := r.UnLock(ctx, lockKey, releaseID)
+        if err != nil {
+            log.Printf("Error releasing lock: %v", err)
+        } else if unlocked {
+            log.Println("Lock released successfully")
+        } else {
+            log.Println("Lock was already released or expired")
+        }
+    } else {
+        log.Println("Could not acquire lock, another process is working")
+    }
+
+    // Priority Queue Example
+    taskQueue := redis.NewPriorityQueue[Task]("task_queue", r)
+
+    // Add tasks with different priorities (lower number = higher priority)
+    tasks := []struct {
+        task     Task
+        priority int
+    }{
+        {Task{ID: "1", Description: "Critical task", UserID: "user1"}, 1},
+        {Task{ID: "2", Description: "Normal task", UserID: "user2"}, 5},
+        {Task{ID: "3", Description: "Low priority task", UserID: "user3"}, 10},
+        {Task{ID: "4", Description: "High priority task", UserID: "user4"}, 2},
+    }
+
+    // Push tasks to queue
+    for _, t := range tasks {
+        err := taskQueue.Push(ctx, t.task, t.priority)
+        if err != nil {
+            log.Printf("Failed to push task %s: %v", t.task.ID, err)
+        } else {
+            log.Printf("Pushed task: %s (priority: %d)", t.task.Description, t.priority)
+        }
+    }
+
+    // Process tasks by priority (peek without removing)
+    tasksToProcess, err := taskQueue.Pop(ctx, 2)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("\nNext %d tasks to process:\n", len(tasksToProcess))
+    for i, task := range tasksToProcess {
+        fmt.Printf("%d. %s (ID: %s)\n", i+1, task.Description, task.ID)
+    }
+
+    // Process and remove tasks atomically
+    processedTasks, err := taskQueue.PopManyAndRemove(ctx, 2)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("\nProcessed %d tasks:\n", len(processedTasks))
+    for _, task := range processedTasks {
+        fmt.Printf("- Completed: %s for user %s\n", task.Description, task.UserID)
+    }
+
+    // Check remaining tasks
+    remainingTasks, err := taskQueue.Pop(ctx, 10)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("\nRemaining tasks in queue: %d\n", len(remainingTasks))
+}
+----
+
+== Configuration
+
+[source,go]
+----
+config := &redis.Config{
+    Host:     "localhost",  // Redis host
+    Port:     "6379",       // Redis port
+    Username: "",           // Username (Redis 6+)
+    Password: "",           // Password
+    Db:       0,            // Database number
+    Ttl:      3600,         // Default TTL in seconds
+}
+----
+
+== Distributed Locking
+
+[source,go]
+----
+// Acquire lock with custom TTL
+lockKey := "resource:123"
+releaseID := "unique-worker-id"
+ttl := 30 * time.Second
+
+locked, err := r.Lock(ctx, lockKey, releaseID, ttl)
+if err != nil {
+    log.Printf("Lock error: %v", err)
+} else if locked {
+    // Critical section - only one process can execute this
+    defer func() {
+        unlocked, _ := r.UnLock(ctx, lockKey, releaseID)
+        if unlocked {
+            log.Println("Lock released")
+        }
+    }()
+
+    // Your critical code here
+}
+----
+
+== Priority Queue Operations
+
+[source,go]
+----
+// Create priority queue
+queue := redis.NewPriorityQueue[string]("my_queue", r)
+
+// Add items (lower priority number = higher priority)
+queue.Push(ctx, "urgent_task", 1)
+queue.Push(ctx, "normal_task", 5)
+queue.Push(ctx, "low_priority", 10)
+
+// Peek at items without removing
+items, err := queue.Pop(ctx, 2)
+// Returns: ["urgent_task", "normal_task"]
+
+// Process and remove items atomically
+processed, err := queue.PopManyAndRemove(ctx, 1)
+// Returns and removes: ["urgent_task"]
+----
+
+== Error Handling
+
+[source,go]
+----
+// Handle connection errors
+r, err := redis.Open(ctx, config, logger)
+if err != nil {
+    log.Printf("Failed to connect to Redis: %v", err)
+    return
+}
+
+// Handle Redis operation errors
+val, err := r.Instance.Get(ctx, "key").Result()
+if err != nil {
+    if err == redis.NotFound {
+        log.Println("Key does not exist")
+    } else {
+        log.Printf("Redis error: %v", err)
+    }
+}
+
+// Handle lock timeout
+locked, err := r.Lock(ctx, "key", "id", time.Second)
+if err != nil {
+    log.Printf("Lock failed: %v", err)
+} else if !locked {
+    log.Println("Resource is already locked by another process")
+}
+----
+
+== Dependencies
+
+* `github.com/go-redis/redis/v8` - Redis Go client
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+The Redis client is thread-safe and can be used concurrently from multiple goroutines. Distributed locks ensure safe access to shared resources across processes.

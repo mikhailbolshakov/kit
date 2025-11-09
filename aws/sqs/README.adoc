@@ -1,0 +1,275 @@
+= SQS Client Package
+
+A Go client library for interacting with Amazon Simple Queue Service (SQS), providing simplified methods for message consumption and queue management with built-in subscription capabilities.
+
+== Features
+
+* SQS client with queue URL resolution and message retrieval
+* Background message subscriber with configurable polling
+* Automatic error handling with custom error codes
+* Channel-based message delivery for easy integration
+* Configurable message fetching parameters
+* Context-aware operations with proper cancellation
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/aws/sqs"
+----
+
+== Configuration
+
+The SQS client requires configuration through the `Config` struct:
+
+[source,go]
+----
+type Config struct {
+    FetchInterval     int64 `mapstructure:"fetch_interval"`     // Polling interval in nanoseconds
+    MaxMessages       int32 `mapstructure:"max_messages"`       // Maximum messages per fetch (1-10)
+    VisibilityTimeout int32 `mapstructure:"visibility_timeout"` // Message visibility timeout in seconds
+}
+----
+
+== Usage
+
+=== Basic Client Setup
+
+[source,go]
+----
+// Initialize the SQS client
+client := sqs.NewClient(awsConfig, logger)
+
+// Initialize AWS connection
+err := client.Init(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== Queue Operations
+
+==== Get Queue URL
+Retrieve the URL for a specific queue:
+
+[source,go]
+----
+queueURL, err := client.GetQueueURL(ctx, &sqs.GetQueueUrlInput{
+    QueueName: aws.String("my-queue-name"),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Queue URL:", *queueURL.QueueUrl)
+----
+
+==== Receive Messages
+Fetch messages from a queue:
+
+[source,go]
+----
+messages, err := client.GetMessages(ctx, &sqs.ReceiveMessageInput{
+    QueueUrl:            queueURL.QueueUrl,
+    MaxNumberOfMessages: 10,
+    VisibilityTimeout:   30,
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, message := range messages.Messages {
+    fmt.Println("Message ID:", *message.MessageId)
+    fmt.Println("Body:", *message.Body)
+}
+----
+
+=== Message Subscription
+
+The subscriber provides automatic background polling with channel-based message delivery.
+
+==== Setup Subscriber
+
+[source,go]
+----
+// Create a channel to receive messages
+messageChannel := make(chan types.Message, 100)
+
+// Configure subscriber settings
+config := &sqs.Config{
+    FetchInterval:     5 * time.Second.Nanoseconds(), // Poll every 5 seconds
+    MaxMessages:       10,                            // Fetch up to 10 messages
+    VisibilityTimeout: 30,                            // 30 second visibility timeout
+}
+
+// Create subscriber
+subscriber := sqs.NewSubscriber(client, config, "my-queue-name", messageChannel, logger)
+----
+
+==== Run Subscriber
+
+[source,go]
+----
+// Start the subscriber in background
+err := subscriber.Run(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Process messages from the channel
+go func() {
+    for {
+        select {
+        case message := <-messageChannel:
+            // Process the message
+            fmt.Printf("Received: %s\n", *message.Body)
+
+            // TODO: Delete message after successful processing
+
+        case <-ctx.Done():
+            return
+        }
+    }
+}()
+----
+
+=== Complete Example
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+
+    "github.com/aws/aws-sdk-go-v2/service/sqs/types"
+    "gitlab.com/algmib/kit"
+    kitAws "gitlab.com/algmib/kit/aws"
+    "gitlab.com/algmib/kit/aws/sqs"
+)
+
+func main() {
+    ctx := context.Background()
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    // AWS configuration
+    awsConfig := &kitAws.Config{
+        Region:          "us-west-2",
+        AccessKeyId:     "your-access-key",
+        SecretAccessKey: "your-secret-key",
+    }
+
+    // SQS configuration
+    sqsConfig := &sqs.Config{
+        FetchInterval:     3 * time.Second.Nanoseconds(),
+        MaxMessages:       5,
+        VisibilityTimeout: 30,
+    }
+
+    // Initialize client
+    client := sqs.NewClient(awsConfig, logger)
+    err := client.Init(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Create message channel
+    messageChannel := make(chan types.Message, 50)
+
+    // Setup subscriber
+    subscriber := sqs.NewSubscriber(client, sqsConfig, "my-work-queue", messageChannel, logger)
+
+    // Start subscriber
+    err = subscriber.Run(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Process messages
+    for message := range messageChannel {
+        log.Printf("Processing message: %s", *message.Body)
+        // Process your message here
+    }
+}
+----
+
+== Configuration Parameters
+
+=== FetchInterval
+* **Type**: `int64` (nanoseconds)
+* **Description**: How often the subscriber polls SQS for new messages
+* **Recommended**: 1-30 seconds depending on message frequency
+* **Example**: `5 * time.Second.Nanoseconds()`
+
+=== MaxMessages
+* **Type**: `int32`
+* **Range**: 1-10 (SQS limitation)
+* **Description**: Maximum number of messages to retrieve in a single request
+* **Recommended**: 10 for high throughput, 1-5 for low latency
+
+=== VisibilityTimeout
+* **Type**: `int32` (seconds)
+* **Range**: 0-43200 (12 hours)
+* **Description**: How long messages remain invisible after being received
+* **Recommended**: Set based on your processing time + buffer
+
+== Error Handling
+
+The package defines custom error codes for different operations:
+
+* `SQS-001`: Get queue URL errors
+* `SQS-002`: Receive messages errors
+* `SQS-003`: Subscriber message retrieval errors
+
+[source,go]
+----
+if err != nil {
+    // All errors are wrapped with context information
+    log.Printf("SQS error: %v", err)
+
+    // Check for specific error types if needed
+    if strings.Contains(err.Error(), "SQS-001") {
+        // Handle queue URL resolution error
+    }
+}
+----
+
+== Best Practices
+
+1. **Context Usage**: Always pass context for proper cancellation and timeout handling
+2. **Channel Buffering**: Size your message channels appropriately to prevent blocking
+3. **Message Deletion**: Remember to delete messages after successful processing (not implemented in this client)
+4. **Error Handling**: Implement retry logic for transient failures
+5. **Graceful Shutdown**: Use context cancellation for clean subscriber shutdown
+6. **Monitoring**: Monitor channel lengths and processing times
+7. **Dead Letter Queues**: Configure DLQs in AWS for failed message handling
+
+== Concurrent Processing
+
+The subscriber runs in a separate goroutine and is safe for concurrent use:
+
+[source,go]
+----
+// Multiple workers can process from the same channel
+for i := 0; i < 3; i++ {
+    go func(workerID int) {
+        for message := range messageChannel {
+            log.Printf("Worker %d processing: %s", workerID, *message.Body)
+            // Process message
+        }
+    }(i)
+}
+----
+
+== Dependencies
+
+* AWS SDK for Go v2
+* ChatLab Kit utilities for logging, error handling, and goroutine management
+
+== Thread Safety
+
+Both the Client and Subscriber are thread-safe and can be used concurrently across multiple goroutines.

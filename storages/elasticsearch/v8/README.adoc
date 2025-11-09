@@ -1,0 +1,520 @@
+= Elasticsearch v8 Package
+
+A Go client library for Elasticsearch v8, providing a comprehensive interface for document operations, index management, and search functionality with builder patterns and type safety.
+
+== Features
+
+* **Document Operations**: Index, update, delete, and check document existence
+* **Index Management**: Create, delete, and manage indices with mapping support
+* **Search Operations**: Execute search queries with flexible query builders
+* **Builder Patterns**: Fluent interfaces for building queries, mappings, and data
+* **Model-based Mapping**: Generate Elasticsearch mappings from Go structs
+* **Alias Management**: Handle index aliases and write indices
+* **Context-aware**: All operations support context for cancellation and timeouts
+* **Type Safety**: Strongly typed interfaces and error handling
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/elasticsearch/v8"
+----
+
+== Configuration
+
+[source,go]
+----
+type Config struct {
+    Url      string // Elasticsearch URL
+    Trace    bool   // Enable request tracing
+    Shards   int    // Default number of shards
+    Replicas int    // Default number of replicas
+    Username string // Basic auth username
+    Password string // Basic auth password
+    Refresh  bool   // Force refresh after operations (testing only)
+}
+----
+
+== Basic Usage
+
+=== Client Setup
+
+[source,go]
+----
+// Configure Elasticsearch
+config := &v8.Config{
+    Url:      "http://localhost:9200",
+    Shards:   1,
+    Replicas: 0,
+    Username: "elastic",
+    Password: "password",
+    Refresh:  false, // Only true for testing
+}
+
+// Create client
+client, err := v8.NewEs(config, logger)
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Close(ctx)
+
+// Test connection
+if !client.Ping() {
+    log.Fatal("Elasticsearch not reachable")
+}
+----
+
+== Document Operations
+
+=== Index Documents
+
+[source,go]
+----
+// Create document data
+document := map[string]interface{}{
+    "title":      "Sample Article",
+    "content":    "This is the article content",
+    "author":     "John Doe",
+    "created_at": time.Now(),
+    "tags":       []string{"golang", "elasticsearch"},
+}
+
+// Index document
+err := client.Document().Index(ctx, "articles", "doc-1", v8.JsonData(document))
+if err != nil {
+    log.Printf("Failed to index: %v", err)
+}
+----
+
+=== Update Documents
+
+[source,go]
+----
+// Update document
+updateData := map[string]interface{}{
+    "doc": map[string]interface{}{
+        "title": "Updated Article Title",
+        "updated_at": time.Now(),
+    },
+}
+
+err := client.Document().Update(ctx, "articles", "doc-1", v8.JsonData(updateData))
+if err != nil {
+    log.Printf("Failed to update: %v", err)
+}
+----
+
+=== Check Document Existence
+
+[source,go]
+----
+exists, err := client.Document().Exists(ctx, "articles", "doc-1")
+if err != nil {
+    log.Printf("Error checking existence: %v", err)
+} else if exists {
+    fmt.Println("Document exists")
+}
+----
+
+=== Delete Documents
+
+[source,go]
+----
+err := client.Document().Delete(ctx, "articles", "doc-1")
+if err != nil {
+    log.Printf("Failed to delete: %v", err)
+}
+----
+
+== Index Management
+
+=== Create Index with Explicit Mapping
+
+[source,go]
+----
+// Define mapping
+mapping := `{
+    "settings": {
+        "number_of_shards": 1,
+        "number_of_replicas": 0
+    },
+    "mappings": {
+        "properties": {
+            "title": {
+                "type": "text",
+                "analyzer": "standard"
+            },
+            "content": {
+                "type": "text"
+            },
+            "author": {
+                "type": "keyword"
+            },
+            "created_at": {
+                "type": "date"
+            },
+            "tags": {
+                "type": "keyword"
+            }
+        }
+    }
+}`
+
+// Create index
+err := client.Index().Create(ctx, "articles", v8.StringMapping(mapping))
+if err != nil {
+    log.Printf("Failed to create index: %v", err)
+}
+----
+
+=== Model-based Index Creation
+
+[source,go]
+----
+// Define struct with ES mapping tags
+type Article struct {
+    ID        string    `json:"id" es:"type:keyword"`
+    Title     string    `json:"title" es:"type:text"`
+    Content   string    `json:"content" es:"type:text"`
+    Author    string    `json:"author" es:"type:keyword"`
+    CreatedAt time.Time `json:"created_at" es:"type:date"`
+    Tags      []string  `json:"tags" es:"type:keyword"`
+    Views     int       `json:"views" es:"type:integer"`
+    Published bool      `json:"published" es:"type:boolean"`
+    Internal  string    `json:"internal" es:"-"` // Not indexed
+}
+
+// Create index using model
+builder := client.Index().NewBuilder()
+err := builder.
+    WithIndex("articles").
+    WithMappingModel(&Article{}).
+    Build(ctx)
+if err != nil {
+    log.Printf("Failed to create index: %v", err)
+}
+----
+
+=== Alias Management
+
+[source,go]
+----
+// Create index with alias
+builder := client.Index().NewBuilder()
+err := builder.
+    WithAlias("articles").
+    WithMappingModel(&Article{}).
+    Build(ctx)
+if err != nil {
+    log.Printf("Failed to create alias: %v", err)
+}
+----
+
+== Search Operations
+
+=== Basic Search
+
+[source,go]
+----
+// Create search query
+query := v8.MatchAllQuery()
+
+// Execute search
+response, err := client.Search().Search(ctx, "articles", query)
+if err != nil {
+    log.Printf("Search failed: %v", err)
+} else {
+    fmt.Printf("Found %d documents\n", response.Hits.Total.Value)
+
+    for _, hit := range response.Hits.Hits {
+        fmt.Printf("Document ID: %s, Score: %f\n", hit.ID, hit.Score)
+        // Process hit.Source for document data
+    }
+}
+----
+
+=== Custom Search Queries
+
+[source,go]
+----
+// Build custom query (you'll need to implement query builders)
+queryBuilder := client.Search().NewBuilder()
+query := queryBuilder.Build() // Implement your query logic
+
+response, err := client.Search().Search(ctx, "articles", query)
+if err != nil {
+    log.Printf("Search failed: %v", err)
+}
+----
+
+== Data Builders
+
+=== JSON Data Builder
+
+[source,go]
+----
+// From struct
+article := Article{
+    Title:   "Go and Elasticsearch",
+    Content: "A comprehensive guide",
+    Author:  "Jane Doe",
+}
+data := v8.JsonData(article)
+
+// From map
+docMap := map[string]interface{}{
+    "title": "Dynamic Document",
+    "content": "Created dynamically",
+}
+data = v8.JsonData(docMap)
+
+// From string
+jsonStr := `{"title": "String Document", "content": "From JSON string"}`
+data = v8.StringData(jsonStr)
+
+// From bytes
+jsonBytes := []byte(`{"title": "Byte Document"}`)
+data = v8.ByteData(jsonBytes)
+----
+
+=== Mapping Builders
+
+[source,go]
+----
+// From string
+mapping := v8.StringMapping(`{"mappings": {...}}`)
+
+// From struct
+mappingStruct := map[string]interface{}{
+    "mappings": map[string]interface{}{
+        "properties": map[string]interface{}{
+            "title": map[string]interface{}{
+                "type": "text",
+            },
+        },
+    },
+}
+mapping = v8.JsonMapping(mappingStruct)
+
+// From bytes
+mappingBytes := []byte(`{"mappings": {...}}`)
+mapping = v8.ByteMapping(mappingBytes)
+----
+
+== Advanced Usage
+
+=== Index Operations
+
+[source,go]
+----
+// Check if index exists
+exists, err := client.Index().Exists(ctx, "articles")
+if err != nil {
+    log.Printf("Error checking index: %v", err)
+}
+
+// Get index mapping
+mapping, err := client.Index().GetMapping(ctx, "articles")
+if err != nil {
+    log.Printf("Error getting mapping: %v", err)
+}
+
+// Update mapping
+newMapping := v8.StringMapping(`{
+    "properties": {
+        "new_field": {
+            "type": "keyword"
+        }
+    }
+}`)
+err = client.Index().PutMapping(ctx, "articles", newMapping)
+
+// Delete indices
+err = client.Index().Delete(ctx, []string{"old_index1", "old_index2"})
+
+// Refresh index
+err = client.Index().Refresh(ctx, "articles")
+----
+
+=== Alias Operations
+
+[source,go]
+----
+// Get indices by alias
+indices, err := client.Index().GetIndices(ctx, "articles")
+if err != nil {
+    log.Printf("Error getting indices: %v", err)
+}
+
+// Delete all indices for an alias
+err = client.Index().DeleteIndices(ctx, "articles")
+if err != nil {
+    log.Printf("Error deleting indices: %v", err)
+}
+
+// Update aliases
+aliasAction := &v8.AliasAction{
+    Actions: []v8.AliasActions{
+        {
+            Add: &v8.AliasAddAction{
+                Index:        "articles-2024",
+                Alias:        "articles",
+                IsWriteIndex: true,
+            },
+        },
+        {
+            Remove: &v8.AliasRemoveAction{
+                Index: "articles-2023",
+                Alias: "articles",
+            },
+        },
+    },
+}
+err = client.Index().UpdateAliases(ctx, aliasAction)
+----
+
+== Complete Example
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+
+    "gitlab.com/algmib/kit"
+    v8 "gitlab.com/algmib/kit/elasticsearch/v8"
+)
+
+type Article struct {
+    ID        string    `json:"id" es:"type:keyword"`
+    Title     string    `json:"title" es:"type:text"`
+    Content   string    `json:"content" es:"type:text"`
+    Author    string    `json:"author" es:"type:keyword"`
+    CreatedAt time.Time `json:"created_at" es:"type:date"`
+    Tags      []string  `json:"tags" es:"type:keyword"`
+    Published bool      `json:"published" es:"type:boolean"`
+}
+
+func main() {
+    ctx := context.Background()
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    // Configure and create client
+    config := &v8.Config{
+        Url:      "http://localhost:9200",
+        Shards:   1,
+        Replicas: 0,
+        Refresh:  true, // Only for demo
+    }
+
+    client, err := v8.NewEs(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close(ctx)
+
+    // Create index with model-based mapping
+    builder := client.Index().NewBuilder()
+    err = builder.
+        WithAlias("articles").
+        WithMappingModel(&Article{}).
+        Build(ctx)
+    if err != nil {
+        log.Printf("Index creation failed: %v", err)
+    }
+
+    // Index some documents
+    articles := []Article{
+        {
+            ID:        "1",
+            Title:     "Introduction to Elasticsearch",
+            Content:   "Elasticsearch is a powerful search engine...",
+            Author:    "John Doe",
+            CreatedAt: time.Now(),
+            Tags:      []string{"elasticsearch", "search", "intro"},
+            Published: true,
+        },
+        {
+            ID:        "2",
+            Title:     "Advanced Elasticsearch Techniques",
+            Content:   "Learn about complex queries and aggregations...",
+            Author:    "Jane Smith",
+            CreatedAt: time.Now().Add(-time.Hour),
+            Tags:      []string{"elasticsearch", "advanced", "queries"},
+            Published: true,
+        },
+    }
+
+    for _, article := range articles {
+        err = client.Document().Index(ctx, "articles", article.ID, v8.JsonData(article))
+        if err != nil {
+            log.Printf("Failed to index article %s: %v", article.ID, err)
+        } else {
+            log.Printf("Indexed article: %s", article.Title)
+        }
+    }
+
+    // Search documents
+    query := v8.MatchAllQuery()
+    response, err := client.Search().Search(ctx, "articles", query)
+    if err != nil {
+        log.Printf("Search failed: %v", err)
+    } else {
+        log.Printf("Found %d articles", response.Hits.Total.Value)
+    }
+}
+----
+
+== ES Struct Tags
+
+When using model-based mapping, use these struct tags:
+
+[source,go]
+----
+type Example struct {
+    // Basic field types
+    TextContent    string   `json:"text_content" es:"type:text"`
+    Keywords       string   `json:"keywords" es:"type:keyword"`
+    DateField      time.Time `json:"date_field" es:"type:date"`
+    BoolField      bool     `json:"bool_field" es:"type:boolean"`
+    IntField       int      `json:"int_field" es:"type:integer"`
+    LongField      int64    `json:"long_field" es:"type:long"`
+
+    // Special fields
+    SearchAsType   string   `json:"search_field" es:"type:search_as_you_type"`
+    FlattenedField map[string]string `json:"flattened" es:"type:flattened"`
+
+    // Nested objects
+    NestedField    []NestedStruct `json:"nested" es:"type:nested"`
+
+    // Non-indexed field
+    Internal       string   `json:"internal" es:"-"`
+
+    // With scaling factor (for scaled_float type)
+    Price          float64  `json:"price" es:"type:scaled_float;scaling_factor:100"`
+}
+----
+
+== Best Practices
+
+1. **Index Design**: Plan your mapping carefully before creating indices
+2. **Alias Usage**: Use aliases for production environments to enable zero-downtime updates
+3. **Model Tags**: Use struct tags for type-safe mapping generation
+4. **Context Usage**: Always pass context for proper timeout and cancellation handling
+5. **Error Handling**: Handle errors appropriately and log them for debugging
+6. **Refresh Settings**: Never use `Refresh: true` in production
+7. **Resource Management**: Properly close clients and handle resource cleanup
+
+== Dependencies
+
+* Official Elasticsearch Go client v8
+* ChatLab Kit utilities for logging and JSON operations
+
+== Thread Safety
+
+The Elasticsearch client is thread-safe and can be used concurrently from multiple goroutines.

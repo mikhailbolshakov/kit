@@ -1,0 +1,153 @@
+= Kit: Go Library for Common Business and Infrastructure Tasks
+Draft, v1.0
+:toc:
+:toc-title: Table of Contents
+
+== Overview
+
+Kit is a comprehensive Go library providing reusable components for common business and infrastructure tasks, including database connectivity, caching, messaging, logging, error handling, and system utilities.
+
+
+== Local Development
+
+[source,bash]
+----
+# Full build with all artifacts
+make artifacts
+
+# Build library
+make build
+
+# Run unit tests
+make test
+
+# Run tests with coverage
+make test-with-coverage
+
+# Run integration tests (requires local infrastructure)
+make test-integration
+
+# Generate mocks
+make mock
+
+# Generate protobuf files
+make proto
+
+# Update dependencies
+make dep
+
+# Create vendor directory
+make vendor
+----
+
+== Available Packages
+
+* **aerospike** - Aerospike database connectivity and operations
+* **batch** - Batch processing utilities
+* **centrifugo** - Centrifugo real-time messaging integration
+* **clickhouse** - ClickHouse database operations
+* **cluster** - Cluster management utilities
+* **elasticsearch/v7** - Elasticsearch v7 client operations
+* **elasticsearch/v8** - Elasticsearch v8 client operations
+* **event** - Event handling and processing
+* **excel** - Excel file reading and processing
+* **ftp** - FTP client operations
+* **google** - Google services integration
+* **goroutine** - Enhanced goroutine management
+* **grpc** - gRPC utilities and helpers
+* **kafka** - Kafka messaging operations
+* **localization** - Multi-language translation support
+* **memcache** - In-memory caching with TTL
+* **migration** - Database migration management
+* **minio** - MinIO object storage operations
+* **mongodb** - MongoDB database connectivity
+* **monitoring** - Prometheus metrics collection
+* **pg** - PostgreSQL database operations with GORM
+* **profile** - Application profiling utilities
+* **redis** - Redis operations, locking, and priority queues
+* **rpc** - Asynchronous RPC communication
+* **vault** - HashiCorp Vault PKI operations
+
+== Core Features
+
+* **Error Handling** - Structured application errors with context support
+* **Request Context** - Rich request context for distributed applications
+* **Logging** - Structured logging with zerolog integration
+* **Functional Utilities** - Generic functional programming helpers
+* **System Utilities** - Async operations, retry mechanisms, and wait groups
+
+== Installation
+
+[source,go]
+----
+go get gitlab.com/algmib/kit
+----
+
+== Basic Usage
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+
+    "gitlab.com/algmib/kit"
+    "gitlab.com/algmib/kit/redis"
+    "gitlab.com/algmib/kit/pg"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Initialize logger
+    logger := kit.InitLogger(&kit.LogConfig{
+        Level:   kit.InfoLevel,
+        Format:  kit.FormatterText,
+        Context: true,
+    })
+
+    l := kit.L(logger)
+    l.Inf("Application starting")
+
+    // Example: Redis connection
+    redisConfig := &redis.Config{
+        Host: "localhost",
+        Port: "6379",
+    }
+
+    redisClient, err := redis.Open(ctx, redisConfig, func() kit.CLogger { return l })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer redisClient.Close()
+
+    l.Inf("Connected to Redis")
+}
+----
+
+== Development Workflow
+
+1. **Dependencies**: Run `make dep` to update Go modules
+2. **Vendor**: Run `make vendor` to create vendor directory
+3. **Mocks**: Run `make mock` to generate test mocks
+4. **Build**: Run `make build` to compile the library
+5. **Test**: Run `make test` for unit tests
+6. **Integration**: Run `make test-integration` for integration tests
+7. **Artifacts**: Run `make artifacts` for complete build
+
+== CI/CD
+
+The project includes CI/CD commands for automated testing and validation:
+
+* `make ci-check` - Validates mocks are up to date
+* `make ci-build-mr` - Builds and tests for merge requests
+
+== Go Version Compatibility
+
+This library requires Go 1.24.1 or later due to generics usage in functional utilities and other components.
+
+== License
+
+...

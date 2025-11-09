@@ -1,0 +1,120 @@
+= Kit System Utilities
+
+A Go library providing system-level utilities for asynchronous operations, including awaiting conditions with timeouts, enhanced wait groups with duration limits, and configurable retry mechanisms with generic function support.
+
+== Features
+
+* Asynchronous condition awaiting with configurable timeouts
+* Enhanced WaitGroup with timeout support
+* Generic retry mechanism with customizable backoff strategies
+* Thread-safe atomic operations
+* Context-aware error handling
+* Configurable timing and attempt limits
+* Non-blocking channel-based operations
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit"
+----
+
+== Basic Usage
+
+== Await Function
+
+[source,go]
+----
+// Await a condition with custom timing
+awaitChan := kit.Await(
+    func() (bool, error) {
+        // Your condition check logic
+        ready := checkSomeCondition()
+        if ready {
+            return true, nil // Condition met
+        }
+        return false, nil // Continue waiting
+    },
+    1*time.Second,  // Check interval
+    30*time.Second, // Overall timeout
+)
+
+// Handle result
+if err := <-awaitChan; err != nil {
+    // Handle timeout or error
+    log.Printf("Await failed: %v", err)
+} else {
+    // Condition was met
+    log.Println("Condition satisfied!")
+}
+----
+
+== Enhanced WaitGroup
+
+[source,go]
+----
+wg := kit.NewWG()
+
+// Add tasks
+for i := 0; i < 10; i++ {
+    wg.Add(1)
+    go func(id int) {
+        defer wg.Done()
+        // Your work here
+        processItem(id)
+    }(i)
+}
+
+// Wait with timeout
+if wg.Wait(30 * time.Second) {
+    log.Println("All tasks completed")
+} else {
+    log.Println("Timeout reached, some tasks may still be running")
+}
+----
+
+== Retry Configurations
+
+[source,go]
+----
+// Exponential backoff
+exponentialConfig := kit.RetryCfg{
+    MaxAttempts: 5,
+    NextAttemptFn: func(curTime time.Time, attempt int) time.Time {
+        delay := time.Duration(1<<attempt) * time.Second // 1s, 2s, 4s, 8s, 16s
+        return curTime.Add(delay)
+    },
+}
+
+// Fixed interval
+fixedConfig := kit.RetryCfg{
+    MaxAttempts: 3,
+    NextAttemptFn: func(curTime time.Time, attempt int) time.Time {
+        return curTime.Add(5 * time.Second) // Always wait 5 seconds
+    },
+}
+
+// Linear backoff
+linearConfig := kit.RetryCfg{
+    MaxAttempts: 4,
+    NextAttemptFn: func(curTime time.Time, attempt int) time.Time {
+        delay := time.Duration(attempt+1) * 2 * time.Second // 2s, 4s, 6s, 8s
+        return curTime.Add(delay)
+    },
+}
+
+// Default configuration (if not specified)
+// MaxAttempts: 3
+// NextAttemptFn: 60*attempt seconds (60s, 120s, 180s)
+----
+== Dependencies
+
+* `go.uber.org/atomic` - Atomic operations for thread-safe counters
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+All utilities are thread-safe and can be used concurrently:
+- `Await` creates isolated goroutines
+- `WaitGroup` uses atomic operations
+- `Retry` is stateless and safe for concurrent use

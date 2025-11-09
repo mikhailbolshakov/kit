@@ -1,0 +1,356 @@
+
+= Vault Package
+
+A Go library for HashiCorp Vault PKI operations, providing simple certificate management including CSR generation, certificate signing, root CA creation, and role management with built-in logging and error handling.
+
+== Features
+
+* PKI engine management (enable/disable/mount)
+* Certificate Signing Request (CSR) generation
+* Root Certificate Authority (CA) creation
+* Intermediate CA signing and certificate chain management
+* Certificate signing and issuance with roles
+* Certificate retrieval and validation
+* Role creation and management
+* Configurable TTL and timeout settings
+* Context-aware operations with proper error handling
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/vault"
+----
+
+== Basic Usage
+
+=== Simple PKI Setup and Certificate Operations
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+
+    "gitlab.com/algmib/kit/vault"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Configure Vault connection
+    config := &vault.Config{
+        Url:        "http://localhost:8200",
+        Token:      "hvs.your-vault-token",
+        TimeoutSec: 30,
+    }
+
+    // Create Vault client
+    client := vault.NewVault(logger)
+
+    // Initialize connection
+    err := client.Init(ctx, config)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Enable PKI engine
+    err = client.EnablePKIEngine(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Generate Root CA
+    rootCARequest := &vault.CertificateRequest{
+        CommonName: "My Root CA",
+        TTL:        "720h", // 30 days
+        KeyType:    "rsa",
+        KeyBits:    2048,
+    }
+
+    rootCA, err := client.GenerateRootCA(ctx, rootCARequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Root CA created: %s", rootCA.SerialNumber)
+
+    // Create role for certificate issuance
+    roleRequest := &vault.RoleRequest{
+        Name:                "web-server",
+        AllowedDomains:      []string{"example.com", "*.example.com"},
+        AllowSubdomains:     true,
+        MaxTTL:              "168h", // 7 days
+        TTL:                 "24h",  // 1 day
+        KeyType:             "rsa",
+        KeyBits:             2048,
+        AllowLocalhost:      true,
+        AllowAnyName:        false,
+    }
+
+    role, err := client.CreateRole(ctx, roleRequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Role created: %s", role.Name)
+
+    // Issue certificate using role
+    issueRequest := &vault.IssueRequest{
+        CommonName: "web.example.com",
+        TTL:        "24h",
+        AltNames:   []string{"api.example.com", "admin.example.com"},
+    }
+
+    certificate, err := client.Issue(ctx, "web-server", issueRequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Certificate issued: %s", certificate.SerialNumber)
+    log.Printf("Certificate PEM:\n%s", certificate.Certificate)
+}
+----
+
+=== Advanced Certificate Management
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "crypto/x509"
+    "encoding/pem"
+    "log"
+
+    "gitlab.com/algmib/kit/vault"
+)
+
+func main() {
+    ctx := context.Background()
+
+    config := &vault.Config{
+        Url:        "https://vault.company.com:8200",
+        Token:      "hvs.production-token",
+        TimeoutSec: 60,
+    }
+
+    client := vault.NewVault(logger)
+
+    err := client.Init(ctx, config)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Generate Intermediate CA CSR
+    csrRequest := &vault.CSRRequest{
+        Type: vault.IntermediateCSRType,
+        CertificateRequest: vault.CertificateRequest{
+            CommonName:   "Intermediate CA",
+            Country:      []string{"US"},
+            Province:     []string{"California"},
+            Locality:     []string{"San Francisco"},
+            Organization: []string{"My Company"},
+            OU:           []string{"IT Department"},
+            TTL:          "168h",
+            KeyType:      "rsa",
+            KeyBits:      4096,
+        },
+    }
+
+    csr, err := client.GenerateCSR(ctx, csrRequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("CSR generated: %s", csr.CSR)
+
+    // Sign intermediate CA (assuming you have a root CA)
+    signRequest := &vault.SignRequest{
+        CSR:        csr.CSR,
+        CommonName: "Intermediate CA",
+        TTL:        "168h",
+        Format:     "pem",
+    }
+
+    signedCert, err := client.SignIntermediateCA(ctx, signRequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Set the signed certificate
+    setSignedRequest := &vault.SetSignedCertificateRequest{
+        Certificate: signedCert.Certificate,
+    }
+
+    _, err = client.SetSignedCertificate(ctx, setSignedRequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Println("Intermediate CA configured successfully")
+
+    // Get certificate chain
+    chain, err := client.GetChain(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Certificate chain:\n%s", chain)
+
+    // Retrieve specific certificate by serial number
+    certResponse, err := client.GetCertificate(ctx, signedCert.SerialNumber)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Parse and validate certificate
+    block, _ := pem.Decode([]byte(certResponse.Certificate))
+    if block == nil {
+        log.Fatal("Failed to parse certificate PEM")
+    }
+
+    cert, err := x509.ParseCertificate(block.Bytes)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Certificate Subject: %s", cert.Subject)
+    log.Printf("Certificate Issuer: %s", cert.Issuer)
+    log.Printf("Certificate Valid From: %s", cert.NotBefore)
+    log.Printf("Certificate Valid Until: %s", cert.NotAfter)
+
+    // Sign client certificate using role
+    clientSignRequest := &vault.SignRequest{
+        CSR:        generateClientCSR(), // Your client CSR
+        CommonName: "client.example.com",
+        TTL:        "24h",
+    }
+
+    clientCert, err := client.Sign(ctx, "web-server", clientSignRequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Client certificate signed: %s", clientCert.SerialNumber)
+}
+
+func generateClientCSR() string {
+    // Implementation to generate client CSR
+    // This would typically involve creating a private key and CSR
+    return "-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----"
+}
+----
+
+== Configuration
+
+[source,go]
+----
+config := &vault.Config{
+    Url:        "http://localhost:8200",  // Vault server URL
+    Token:      "hvs.vault-token",        // Vault authentication token
+    TimeoutSec: 30,                       // Request timeout in seconds
+    Mock:       false,                    // Enable mock mode for testing
+}
+----
+
+== Certificate Request Types
+
+[source,go]
+----
+// Root CA certificate request
+rootCARequest := &vault.CertificateRequest{
+    CommonName:   "My Root CA",
+    Country:      []string{"US"},
+    Province:     []string{"California"},
+    Locality:     []string{"San Francisco"},
+    Organization: []string{"My Company"},
+    OU:           []string{"PKI Department"},
+    TTL:          "720h",  // 30 days
+    KeyType:      "rsa",   // or "ec"
+    KeyBits:      2048,    // or 4096 for RSA, 256/384 for EC
+}
+
+// Certificate issue request
+issueRequest := &vault.IssueRequest{
+    CommonName: "api.example.com",
+    TTL:        "24h",
+    AltNames:   []string{"api.example.com", "*.api.example.com"},
+    IPSans:     []string{"10.0.0.1", "192.168.1.1"},
+}
+----
+
+== Role Configuration
+
+[source,go]
+----
+roleRequest := &vault.RoleRequest{
+    Name:                "web-server",
+    AllowedDomains:      []string{"example.com", "*.example.com"},
+    AllowSubdomains:     true,
+    AllowGlobDomains:    false,
+    AllowAnyName:        false,
+    AllowLocalhost:      true,
+    AllowIPSans:         true,
+    MaxTTL:              "168h",  // 7 days maximum
+    TTL:                 "24h",   // Default 1 day
+    KeyType:             "rsa",
+    KeyBits:             2048,
+    KeyUsage:            []string{"DigitalSignature", "KeyAgreement", "KeyEncipherment"},
+    ExtKeyUsage:         []string{"ServerAuth", "ClientAuth"},
+    RequireCN:           true,
+}
+----
+
+== Error Handling
+
+[source,go]
+----
+// Handle connection errors
+err := client.Init(ctx, config)
+if err != nil {
+    log.Printf("Failed to connect to Vault: %v", err)
+    return
+}
+
+// Handle PKI engine errors
+err = client.EnablePKIEngine(ctx)
+if err != nil {
+    log.Printf("Failed to enable PKI engine: %v", err)
+    return
+}
+
+// Handle certificate operations
+cert, err := client.Issue(ctx, "web-server", issueRequest)
+if err != nil {
+    log.Printf("Certificate issuance failed: %v", err)
+    return
+}
+----
+
+== PKI Engine Management
+
+[source,go]
+----
+// Enable PKI engine at default path
+err := client.EnablePKIEngine(ctx)
+
+// Use custom path
+client = client.Path("pki-intermediate")
+err = client.EnablePKIEngine(ctx)
+
+// Disable PKI engine
+err = client.UnmountPKIEngine(ctx)
+----
+
+== Dependencies
+
+* `github.com/hashicorp/vault/api` - Vault Go client
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+The Vault client is thread-safe and can be used concurrently from multiple goroutines.

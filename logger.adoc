@@ -1,0 +1,453 @@
+
+= Kit Logging System
+
+A Go library providing structured logging with context-aware capabilities, built on zerolog with support for multiple output formats, error hooks, stack traces, and request context integration for distributed applications.
+
+== Features
+
+* Structured logging with multiple levels (Trace, Debug, Info, Warn, Error, Fatal)
+* Context-aware logging with automatic request context extraction
+* Multiple output formats (JSON, plain text)
+* Error hooks for external error tracking integration
+* Stack trace support for debugging
+* Component, method, protocol, service, and node field support
+* Thread-safe logger cloning for concurrent use
+* Performance optimized with conditional marshaling
+* io.Writer interface implementation
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit"
+----
+
+== Basic Usage
+
+=== Simple Logging Setup
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "errors"
+
+    "gitlab.com/algmib/kit"
+)
+
+func main() {
+    // Configure logger
+    config := &kit.LogConfig{
+        Level:   kit.InfoLevel,     // Set minimum log level
+        Format:  kit.FormatterText, // Use plain text format
+        Context: true,              // Include request context
+        Service: true,              // Include service fields
+        Caller:  true,              // Include caller information
+    }
+
+    // Initialize logger
+    logger := kit.InitLogger(config)
+
+    // Create context logger
+    l := kit.L(logger)
+
+    // Basic logging
+    l.Inf("Application started")
+    l.InfF("Server listening on port %d", 8080)
+    l.DbgF("Debug message: %s", "detailed info")
+    l.WarnF("Warning: %s", "something might be wrong")
+
+    // Error logging
+    err := errors.New("something went wrong")
+    l.E(err).Err("Operation failed")
+
+    // Structured fields
+    l.F(kit.KV{
+        "user_id":   "123",
+        "operation": "user_login",
+        "ip":        "192.168.1.1",
+    }).Inf("User login successful")
+
+    // Component and method information
+    l.Cmp("auth").Mth("login").Inf("Authentication completed")
+}
+----
+
+=== Advanced Logging with Context and Services
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "net/http"
+
+    "gitlab.com/algmib/kit"
+)
+
+// UserService demonstrates service logging patterns
+type UserService struct {
+    logger kit.CLoggerFunc
+}
+
+func NewUserService(logger kit.CLoggerFunc) *UserService {
+    return &UserService{logger: logger}
+}
+
+func (s *UserService) GetUser(ctx context.Context, userID string) (*User, error) {
+    // Create service logger with context
+    l := s.logger().
+        C(ctx).                    // Add request context
+        Cmp("user-service").       // Component name
+        Mth("get-user").           // Method name
+        F(kit.KV{"user_id": userID}) // Structured fields
+
+    l.Inf("Starting user retrieval")
+
+    // Simulate database operation
+    user, err := s.queryUser(ctx, userID)
+    if err != nil {
+        // Log error with stack trace
+        l.E(err).St().Err("Failed to query user from database")
+
+        return nil, kit.NewAppErrBuilder("USR-001", "user retrieval failed").
+            C(ctx).
+            F(kit.KV{"user_id": userID}).
+            Wrap(err).
+            Err()
+    }
+
+    if user == nil {
+        l.WarnF("User not found: %s", userID)
+        return nil, kit.NewAppErrBuilder("USR-002", "user not found").
+            C(ctx).
+            Business().
+            Err()
+    }
+
+    l.F(kit.KV{"user_name": user.Name}).Inf("User retrieved successfully")
+    return user, nil
+}
+
+func (s *UserService) queryUser(ctx context.Context, userID string) (*User, error) {
+    l := s.logger().C(ctx).Cmp("user-service").Mth("query-user")
+
+    l.DbgF("Querying database for user: %s", userID)
+
+    // Simulate database error
+    if userID == "error" {
+        return nil, fmt.Errorf("database connection timeout")
+    }
+
+    // Simulate user not found
+    if userID == "404" {
+        return nil, nil
+    }
+
+    // Return mock user
+    return &User{
+        ID:   userID,
+        Name: "John Doe",
+        Email: "john@example.com",
+    }, nil
+}
+
+type User struct {
+    ID    string
+    Name  string
+    Email string
+}
+
+// HTTP handler with request context logging
+func (s *UserService) HandleGetUser(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    userID := r.URL.Query().Get("id")
+
+    // Create request-scoped logger
+    l := s.logger().
+        C(ctx).                           // Request context
+        Cmp("http-handler").              // Component
+        Mth("handle-get-user").           // Method
+        Pr("http").                       // Protocol
+        F(kit.KV{
+            "endpoint":   r.URL.Path,
+            "method":     r.Method,
+            "user_agent": r.UserAgent(),
+            "user_id":    userID,
+        })
+
+    l.Inf("Processing HTTP request")
+
+    // Call service
+    user, err := s.GetUser(ctx, userID)
+    if err != nil {
+        l.E(err).Err("Service call failed")
+
+        // Handle application error
+        if appErr, ok := kit.IsAppErr(err); ok {
+            status := http.StatusInternalServerError
+            if appErr.HttpStatus() != nil {
+                status = int(*appErr.HttpStatus())
+            }
+
+            http.Error(w, appErr.Code(), status)
+            return
+        }
+
+        http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+        return
+    }
+
+    // Log successful response
+    l.F(kit.KV{
+        "response_size": len(user.Name) + len(user.Email),
+    }).Inf("Request completed successfully")
+
+    // Return response
+    w.Header().Set("Content-Type", "application/json")
+    fmt.Fprintf(w, `{"id":"%s","name":"%s","email":"%s"}`,
+        user.ID, user.Name, user.Email)
+}
+
+// Error hook for external error tracking
+type ErrorTracker struct {
+    serviceName string
+}
+
+func (et *ErrorTracker) Error(err error) {
+    // Send to external service (e.g., Sentry, DataDog)
+    fmt.Printf("EXTERNAL_TRACKER: [%s] %v\n", et.serviceName, err)
+}
+
+func main() {
+    // Configure logger with JSON format for production
+    config := &kit.LogConfig{
+        Level:   kit.DebugLevel,
+        Format:  kit.FormatterJson,
+        Context: true,
+        Service: true,
+        Caller:  false, // Disable in production for performance
+    }
+
+    logger := kit.InitLogger(config)
+
+    // Set up error hook
+    errorTracker := &ErrorTracker{serviceName: "user-api"}
+    logger.SetErrorHook(errorTracker)
+
+    // Create logger function
+    loggerFunc := func() kit.CLogger { return kit.L(logger) }
+
+    // Initialize service
+    userService := NewUserService(loggerFunc)
+
+    // Set up HTTP routes
+    http.HandleFunc("/user", userService.HandleGetUser)
+
+    // Start server with logging
+    l := kit.L(logger).Cmp("main").Srv("user-api").Node("node-1")
+    l.InfF("Starting server on port %d", 8080)
+
+    if err := http.ListenAndServe(":8080", nil); err != nil {
+        l.E(err).Fatal("Server failed to start")
+    }
+}
+----
+
+== Log Levels
+
+[source,go]
+----
+// Available log levels (in order of severity)
+kit.TraceLevel  // Most verbose, for detailed debugging
+kit.DebugLevel  // Debug information
+kit.InfoLevel   // General information
+kit.WarnLevel   // Warning conditions
+kit.ErrorLevel  // Error conditions
+kit.FatalLevel  // Fatal errors (exits application)
+kit.PanicLevel  // Panic level (highest severity)
+
+// Set log level in configuration
+config := &kit.LogConfig{
+    Level: kit.InfoLevel, // Only Info and above will be logged
+}
+----
+
+== Output Formats
+
+[source,go]
+----
+// Plain text format (human-readable)
+config := &kit.LogConfig{
+    Format: kit.FormatterText,
+}
+// Output: |INFO  | Application started | call.cmp:auth | user_id:123
+
+// JSON format (structured, machine-readable)
+config := &kit.LogConfig{
+    Format: kit.FormatterJson,
+}
+// Output: {"level":"info","ts":"2023-01-01T10:00:00.000-0700","msg":"Application started","call.cmp":"auth","user_id":"123"}
+----
+
+== Structured Logging
+
+[source,go]
+----
+l := kit.L(logger)
+
+// Add structured fields
+l.F(kit.KV{
+    "user_id":     "12345",
+    "session_id":  "sess_abc",
+    "operation":   "checkout",
+    "amount":      99.99,
+    "currency":    "USD",
+    "items_count": 3,
+}).Inf("Order processed")
+
+// Chain multiple field additions
+l.F(kit.KV{"user_id": "123"}).
+  F(kit.KV{"action": "login"}).
+  F(kit.KV{"ip": "192.168.1.1"}).
+  Inf("User authentication")
+----
+
+== Error Handling and Stack Traces
+
+[source,go]
+----
+err := errors.New("database connection failed")
+
+// Log error with stack trace
+l.E(err).St().Err("Critical database error")
+
+// Log application error (includes error code and type)
+appErr := kit.NewAppErrBuilder("DB-001", "connection timeout").Err()
+l.E(appErr).Err("Database operation failed")
+
+// Conditional object logging (only at trace level)
+complexObject := map[string]interface{}{
+    "nested": map[string]string{"key": "value"},
+    "array":  []int{1, 2, 3},
+}
+l.TrcObj("Complex object: %s", complexObject)
+----
+
+== Context Integration
+
+[source,go]
+----
+// Create request context
+reqCtx := kit.NewRequestCtx().
+    WithUser("user123", "john.doe").
+    WithRequestId("req_abc123").
+    WithSessionId("sess_def456").
+    ToContext(context.Background())
+
+// Context is automatically included in logs
+l.C(reqCtx).Inf("Processing request")
+// Output includes: ctx.rid, ctx.un, ctx.sid fields
+----
+
+== Component Organization
+
+[source,go]
+----
+// Organize logs by system components
+l.Srv("user-api").          // Service name
+  Node("pod-123").          // Node/instance identifier
+  Cmp("database").          // Component/module
+  Pr("tcp").                // Protocol
+  Mth("connect").           // Method/function
+  Inf("Establishing connection")
+----
+
+== Performance Considerations
+
+[source,go]
+----
+// Clone logger for goroutines (thread safety)
+func processAsync(logger kit.CLogger, data []string) {
+    go func() {
+        // Always clone when passing between goroutines
+        l := logger.Clone().Cmp("async-processor")
+
+        for _, item := range data {
+            l.F(kit.KV{"item": item}).Dbg("Processing item")
+        }
+    }()
+}
+
+// Conditional expensive operations
+if logger.GetLogger().GetLevel() <= zerolog.DebugLevel {
+    // Only marshal complex objects when debug is enabled
+    complexData := generateComplexData()
+    l.DbgF("Complex data: %+v", complexData)
+}
+----
+
+== Logger Configuration Options
+
+[source,go]
+----
+config := &kit.LogConfig{
+    Level:   kit.InfoLevel,     // Minimum log level
+    Format:  kit.FormatterJson, // Output format (json/plain)
+    Context: true,              // Include request context fields
+    Service: true,              // Include service/node fields
+    Caller:  false,             // Include file:line information
+}
+
+logger := kit.InitLogger(config)
+
+// Dynamic level changes
+logger.SetLevel(kit.DebugLevel)
+----
+
+== Error Hooks
+
+[source,go]
+----
+// Custom error hook for external tracking
+type SentryHook struct {
+    dsn string
+}
+
+func (h *SentryHook) Error(err error) {
+    // Send to Sentry, DataDog, etc.
+    fmt.Printf("Sending to Sentry: %v\n", err)
+}
+
+// Register hook
+logger.SetErrorHook(&SentryHook{dsn: "https://..."})
+----
+
+== io.Writer Interface
+
+[source,go]
+----
+// Logger implements io.Writer for integration with other tools
+logger := kit.L(baseLogger)
+
+// Use as writer (logs at Trace level)
+fmt.Fprint(logger, "This will be logged at trace level")
+
+// Integration with other libraries
+httpServer := &http.Server{
+    ErrorLog: log.New(logger, "", 0),
+}
+----
+
+== Dependencies
+
+* `github.com/rs/zerolog` - High-performance structured logging
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+The base Logger is thread-safe, but CLogger instances are not. Always use `Clone()` when passing CLogger between goroutines to avoid shared state issues.

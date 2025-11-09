@@ -1,0 +1,155 @@
+= Memory Cache Package
+
+A Go library providing simple in-memory caching with TTL (Time To Live) support, built on top of the patrickmn/go-cache library for fast temporary data storage.
+
+== Features
+
+* In-memory key-value storage with TTL support
+* Automatic cleanup of expired items
+* Thread-safe operations
+* Configurable expiration times per item
+* Support for permanent storage (never expires)
+* Simple interface for Get/Set/Delete operations
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/memcache"
+----
+
+== Basic Usage
+
+=== Create Cache and Store Items
+
+[source,go]
+----
+package main
+
+import (
+    "fmt"
+    "time"
+
+    "gitlab.com/algmib/kit/memcache"
+)
+
+func main() {
+    // Create new memory cache
+    cache := memcache.NewMemCache()
+
+    // Store item with default TTL (1 hour)
+    cache.Set("user:123", "John Doe", memcache.DefaultTtl)
+
+    // Store item with custom TTL (5 minutes)
+    cache.Set("session:abc", "active", 5*time.Minute)
+
+    // Store item permanently (never expires)
+    cache.Set("config:app", "production", memcache.Forever)
+
+    // Retrieve items
+    if value, found := cache.Get("user:123"); found {
+        fmt.Printf("User: %s\n", value.(string))
+    }
+
+    // Delete item
+    cache.Delete("session:abc")
+    fmt.Println("Session deleted")
+}
+----
+
+=== Cache with Custom Data Types
+
+[source,go]
+----
+package main
+
+import (
+    "fmt"
+    "time"
+
+    "gitlab.com/algmib/kit/memcache"
+)
+
+type UserData struct {
+    ID    int
+    Name  string
+    Email string
+}
+
+func main() {
+    cache := memcache.NewMemCache()
+
+    // Store struct
+    user := UserData{
+        ID:    123,
+        Name:  "John Doe",
+        Email: "john@example.com",
+    }
+    cache.Set("user:123", user, 10*time.Minute)
+
+    // Retrieve struct
+    if value, found := cache.Get("user:123"); found {
+        userData := value.(UserData)
+        fmt.Printf("User: %+v\n", userData)
+    }
+
+    // Store slice
+    tags := []string{"golang", "cache", "memory"}
+    cache.Set("tags:popular", tags, time.Hour)
+
+    // Retrieve slice
+    if value, found := cache.Get("tags:popular"); found {
+        tagList := value.([]string)
+        fmt.Printf("Popular tags: %v\n", tagList)
+    }
+}
+----
+
+== TTL Constants
+
+[source,go]
+----
+// Use default expiration time (1 hour)
+cache.Set("key", "value", memcache.DefaultTtl)
+
+// Item never expires
+cache.Set("key", "value", memcache.Forever)
+
+// Custom duration
+cache.Set("key", "value", 30*time.Second)
+----
+
+== Error Handling
+
+[source,go]
+----
+// Check if item exists
+if value, found := cache.Get("missing_key"); found {
+    fmt.Printf("Found: %v\n", value)
+} else {
+    fmt.Println("Key not found or expired")
+}
+
+// Safe type assertion
+if value, found := cache.Get("user_data"); found {
+    if userData, ok := value.(UserData); ok {
+        fmt.Printf("User: %+v\n", userData)
+    } else {
+        fmt.Println("Invalid data type")
+    }
+}
+----
+
+== Configuration
+
+The cache uses default settings:
+* **Default expiration**: 1 hour
+* **Cleanup interval**: 5 minutes (automatic removal of expired items)
+
+== Dependencies
+
+* `github.com/patrickmn/go-cache` - In-memory cache library
+
+== Thread Safety
+
+All cache operations are thread-safe and can be used concurrently from multiple goroutines.

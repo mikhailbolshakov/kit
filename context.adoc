@@ -1,0 +1,402 @@
+= Kit Request Context
+
+A Go library providing structured request context management for distributed applications, with support for user information, session tracking, language preferences, and seamless integration with gRPC metadata and HTTP requests.
+
+== Features
+
+* Rich request context with user, session, and application information
+* Fluent builder pattern for context construction
+* gRPC metadata integration for service-to-service communication
+* Language preference support with Go's text/language package
+* Arbitrary key-value storage for custom data
+* Context copying and serialization utilities
+* Thread-safe context operations
+* Map-based context reconstruction
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit"
+----
+
+== Basic Usage
+
+=== Simple Request Context Creation
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "gitlab.com/algmib/kit"
+    "golang.org/x/text/language"
+)
+
+func main() {
+    // Create a new request context
+    reqCtx := kit.NewRequestCtx().
+        WithNewRequestId().
+        WithUser("user123", "john.doe").
+        WithSessionId("sess_abc123").
+        WithApp("my-app").
+        WithClientIp("192.168.1.100").
+        WithRoles("admin", "user").
+        WithLang(language.English).
+        WithKv("department", "engineering").
+        WithKv("region", "us-west")
+
+    // Convert to Go context
+    ctx := reqCtx.ToContext(context.Background())
+
+    // Use in application
+    processRequest(ctx)
+}
+
+func processRequest(ctx context.Context) {
+    // Extract request context
+    if reqCtx, ok := kit.Request(ctx); ok {
+        log.Printf("Processing request %s for user %s (%s)",
+            reqCtx.GetRequestId(), reqCtx.GetUsername(), reqCtx.GetUserId())
+        log.Printf("User roles: %v", reqCtx.GetRoles())
+        log.Printf("Client IP: %s", reqCtx.GetClientIp())
+        log.Printf("Language: %s", reqCtx.GetLang())
+
+        // Access custom key-value data
+        if kv := reqCtx.GetKv(); kv != nil {
+            log.Printf("Department: %v", kv["department"])
+            log.Printf("Region: %v", kv["region"])
+        }
+    } else {
+        log.Println("No request context found")
+    }
+}
+----
+
+=== HTTP Middleware Integration
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "fmt"
+    "net/http"
+
+    "gitlab.com/algmib/kit"
+    "golang.org/x/text/language"
+)
+
+// RequestContextMiddleware extracts and creates request context from HTTP request
+func RequestContextMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Extract information from HTTP request
+        userID := r.Header.Get("X-User-ID")
+        username := r.Header.Get("X-Username")
+        sessionID := r.Header.Get("X-Session-ID")
+        roles := parseRoles(r.Header.Get("X-User-Roles"))
+        clientIP := getClientIP(r)
+
+        // Parse Accept-Language header
+        lang := parseLanguage(r.Header.Get("Accept-Language"))
+
+        // Create request context
+        reqCtx := kit.NewRequestCtx().
+            WithNewRequestId().
+            WithUser(userID, username).
+            WithSessionId(sessionID).
+            WithApp("web-service").
+            WithClientIp(clientIP).
+            WithRoles(roles...).
+            WithLang(lang).
+            WithKv("endpoint", r.URL.Path).
+            WithKv("method", r.Method).
+            WithKv("user_agent", r.UserAgent())
+
+        // Add request context to Go context
+        ctx := reqCtx.ToContext(r.Context())
+
+        // Continue with updated context
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+func apiHandler(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+
+    // Extract request context
+    reqCtx, ok := kit.Request(ctx)
+    if !ok {
+        http.Error(w, "Missing request context", http.StatusInternalServerError)
+        return
+    }
+
+    // Use context information
+    response := map[string]interface{}{
+        "request_id": reqCtx.GetRequestId(),
+        "user_id":    reqCtx.GetUserId(),
+        "username":   reqCtx.GetUsername(),
+        "roles":      reqCtx.GetRoles(),
+        "language":   reqCtx.GetLang().String(),
+        "session_id": reqCtx.GetSessionId(),
+    }
+
+    // Process business logic
+    result, err := processBusinessLogic(ctx, reqCtx.GetUserId())
+    if err != nil {
+        // Error handling with context
+        appErr := kit.NewAppErrBuilder("BIZ-001", "business logic failed").
+            C(ctx).
+            F(kit.KV{"operation": "process_business_logic"}).
+            Err()
+
+        http.Error(w, appErr.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    response["data"] = result
+
+    w.Header().Set("Content-Type", "application/json")
+    w.Header().Set("X-Request-ID", reqCtx.GetRequestId())
+
+    // Return JSON response
+    kit.WriteJSON(w, response)
+}
+
+func processBusinessLogic(ctx context.Context, userID string) (interface{}, error) {
+    // Simulate business logic that uses context
+    if reqCtx, ok := kit.Request(ctx); ok {
+        // Log with request context
+        fmt.Printf("Processing business logic for user %s (request: %s)\n",
+            userID, reqCtx.GetRequestId())
+
+        // Return some data
+        return map[string]string{
+            "status": "success",
+            "user_id": userID,
+        }, nil
+    }
+
+    return nil, fmt.Errorf("missing context")
+}
+
+func parseRoles(roleHeader string) []string {
+    if roleHeader == "" {
+        return []string{}
+    }
+    // Simple comma-separated parsing
+    return strings.Split(roleHeader, ",")
+}
+
+func getClientIP(r *http.Request) string {
+    // Check various headers for client IP
+    if ip := r.Header.Get("X-Real-IP"); ip != "" {
+        return ip
+    }
+    if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
+        return strings.Split(ip, ",")[0]
+    }
+    return r.RemoteAddr
+}
+
+func parseLanguage(acceptLang string) language.Tag {
+    if acceptLang == "" {
+        return language.English
+    }
+
+    tags, _, _ := language.ParseAcceptLanguage(acceptLang)
+    if len(tags) > 0 {
+        return tags[0]
+    }
+
+    return language.English
+}
+
+func main() {
+    mux := http.NewServeMux()
+    mux.HandleFunc("/api/data", apiHandler)
+
+    // Apply middleware
+    handler := RequestContextMiddleware(mux)
+
+    fmt.Println("Server starting on :8080")
+    http.ListenAndServe(":8080", handler)
+}
+----
+
+== gRPC Integration
+
+[source,go]
+----
+import (
+    "google.golang.org/grpc"
+    "google.golang.org/grpc/metadata"
+)
+
+// gRPC client interceptor to add request context to metadata
+func ClientRequestContextInterceptor() grpc.UnaryClientInterceptor {
+    return func(ctx context.Context, method string, req, reply interface{},
+        cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+
+        // Convert request context to gRPC metadata
+        if md, ok := kit.ContextToGrpcMD(ctx); ok {
+            ctx = metadata.NewOutgoingContext(ctx, md)
+        }
+
+        return invoker(ctx, method, req, reply, cc, opts...)
+    }
+}
+
+// gRPC server interceptor to extract request context from metadata
+func ServerRequestContextInterceptor() grpc.UnaryServerInterceptor {
+    return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
+        handler grpc.UnaryHandler) (interface{}, error) {
+
+        // Extract metadata from incoming context
+        if md, ok := metadata.FromIncomingContext(ctx); ok {
+            ctx = kit.FromGrpcMD(ctx, md)
+        }
+
+        return handler(ctx, req)
+    }
+}
+
+// Example gRPC service method
+func (s *UserService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.GetUserResponse, error) {
+    // Extract request context
+    reqCtx, ok := kit.Request(ctx)
+    if !ok {
+        return nil, status.Error(codes.Internal, "missing request context")
+    }
+
+    // Use context for authorization
+    if !hasPermission(reqCtx.GetRoles(), "read_users") {
+        return nil, status.Error(codes.PermissionDenied, "insufficient permissions")
+    }
+
+    // Log with context
+    log.Printf("GetUser request %s from user %s",
+        reqCtx.GetRequestId(), reqCtx.GetUsername())
+
+    // Process request...
+    return &pb.GetUserResponse{}, nil
+}
+----
+
+== Context Utilities
+
+[source,go]
+----
+// Test context creation
+testCtx := kit.NewRequestCtx().
+    TestApp().
+    EN().
+    WithUser("test-user", "test").
+    WithNewRequestId().
+    ToContext(context.Background())
+
+// Copy context
+copiedCtx := kit.Copy(originalCtx)
+
+// Convert context to map for serialization
+if reqCtx, ok := kit.Request(ctx); ok {
+    contextMap := reqCtx.ToMap()
+
+    // Serialize for storage or transmission
+    jsonData, _ := json.Marshal(contextMap)
+
+    // Later, reconstruct context from map
+    var restoredMap map[string]interface{}
+    json.Unmarshal(jsonData, &restoredMap)
+
+    newCtx, err := kit.FromMap(context.Background(), restoredMap)
+    if err != nil {
+        log.Printf("Failed to restore context: %v", err)
+    }
+}
+
+// Must get context (with error)
+reqCtx, err := kit.MustRequest(ctx)
+if err != nil {
+    log.Printf("Context validation failed: %v", err)
+}
+----
+
+== Context Fields
+
+[source,go]
+----
+type RequestContext struct {
+    Rid   string       // Request ID - unique identifier for the request
+    Sid   string       // Session ID - user session identifier
+    Uid   string       // User ID - authenticated user identifier
+    Un    string       // Username - human-readable username
+    App   string       // Application name
+    ClIp  string       // Client IP address
+    Roles []string     // User roles for authorization
+    Lang  language.Tag // Client language preference
+    Kv    KV           // Arbitrary key-value data
+}
+
+// Access methods
+reqCtx.GetRequestId()  // Get request ID
+reqCtx.GetSessionId()  // Get session ID
+reqCtx.GetUserId()     // Get user ID
+reqCtx.GetUsername()   // Get username
+reqCtx.GetApp()        // Get application name
+reqCtx.GetClientIp()   // Get client IP
+reqCtx.GetRoles()      // Get user roles
+reqCtx.GetLang()       // Get language preference
+reqCtx.GetKv()         // Get key-value data
+----
+
+== Builder Methods
+
+[source,go]
+----
+reqCtx := kit.NewRequestCtx().
+    WithRequestId("custom-id").           // Set specific request ID
+    WithNewRequestId().                   // Generate new UUID request ID
+    WithSessionId("sess_123").           // Set session ID
+    WithUser("user123", "john").         // Set user ID and username
+    WithRoles("admin", "editor").        // Set user roles
+    WithApp("my-service").               // Set application name
+    WithClientIp("10.0.0.1").           // Set client IP
+    WithLang(language.Spanish).          // Set language preference
+    WithKv("team", "engineering").       // Add custom key-value data
+    TestApp().                           // Set app to "test"
+    EN()                                 // Set language to English
+----
+
+== Error Integration
+
+[source,go]
+----
+// Errors automatically include request context when using C(ctx)
+err := kit.NewAppErrBuilder("USR-001", "user not found").
+    C(ctx). // Includes request ID, user ID, etc.
+    Business().
+    Err()
+
+// The error will include context fields automatically
+if appErr, ok := kit.IsAppErr(err); ok {
+    fields := appErr.Fields()
+    // fields will contain: _ctx.rid, _ctx.uid, _ctx.un, etc.
+}
+----
+
+== Dependencies
+
+* `golang.org/x/text/language` - Language tag support
+* `google.golang.org/grpc/metadata` - gRPC metadata integration
+* `github.com/mitchellh/mapstructure` - Map-to-struct conversion
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+Request context operations are thread-safe and contexts can be safely passed between goroutines and across service boundaries.

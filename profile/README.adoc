@@ -1,0 +1,151 @@
+= Profile Package
+
+A Go library for exposing application profiling endpoints via HTTP server, providing simple setup for Go's built-in pprof profiling tools to monitor application performance and debug issues.
+
+== Features
+
+* HTTP server for Go pprof profiling endpoints
+* Async server startup with goroutine management
+* Configurable port and enable/disable functionality
+* Built-in error handling and logging
+* Access to CPU, memory, goroutine, and other runtime profiles
+* Simple configuration interface
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/profile"
+----
+
+== Basic Usage
+
+=== Simple Profile Server
+
+[source,go]
+----
+package main
+
+import (
+    "log"
+    "time"
+
+    "gitlab.com/algmib/kit/profile"
+)
+
+func main() {
+    // Create profile server
+    server := profile.New(logger)
+
+    // Configure server
+    config := &profile.Config{
+        Enabled: true,
+        Port:    "6060",
+    }
+
+    // Initialize server
+    err := server.Init(config)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Start listening (async)
+    server.Listen()
+
+    // Your application logic here...
+    time.Sleep(10 * time.Second)
+
+    // Cleanup
+    defer server.Close()
+}
+----
+
+=== Conditional Profile Server
+
+[source,go]
+----
+package main
+
+import (
+    "log"
+    "os"
+
+    "gitlab.com/algmib/kit/profile"
+)
+
+func main() {
+    // Create profile server
+    server := profile.New(logger)
+
+    // Enable profiling only in development
+    enabled := os.Getenv("ENV") == "development"
+
+    config := &profile.Config{
+        Enabled: enabled,
+        Port:    "6060",
+    }
+
+    if config.Enabled {
+        err := server.Init(config)
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        server.Listen()
+        defer server.Close()
+
+        log.Println("Profiling server started on :6060")
+    }
+
+    // Application logic...
+    runApplication()
+}
+----
+
+== Configuration
+
+[source,go]
+----
+config := &profile.Config{
+    Enabled: true,    // Enable/disable profiling server
+    Port:    "6060",  // Port to listen on
+}
+----
+
+== Available Endpoints
+
+Once running, profiling endpoints are available at:
+
+[source,text]
+----
+http://localhost:6060/debug/pprof/          # Profile index
+http://localhost:6060/debug/pprof/profile   # CPU profile
+http://localhost:6060/debug/pprof/heap      # Memory heap profile
+http://localhost:6060/debug/pprof/goroutine # Goroutine profile
+http://localhost:6060/debug/pprof/block     # Block profile
+http://localhost:6060/debug/pprof/mutex     # Mutex profile
+----
+
+== Error Handling
+
+[source,go]
+----
+// Initialize with error handling
+err := server.Init(config)
+if err != nil {
+    log.Printf("Failed to initialize profile server: %v", err)
+    return
+}
+
+// Server handles HTTP errors internally and logs them
+server.Listen()
+----
+
+== Dependencies
+
+* Go's built-in `net/http/pprof` package
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+The profile server is thread-safe and can be started/stopped safely from multiple goroutines.

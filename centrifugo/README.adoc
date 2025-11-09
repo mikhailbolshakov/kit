@@ -1,0 +1,364 @@
+= Centrifugo Package
+
+A Go client library for integrating with Centrifugo real-time messaging server, providing both client and server-side functionality for WebSocket communications.
+
+== Features
+
+* **Client**: WebSocket client for subscribing and receiving real-time messages
+* **Server**: gRPC client for server-side operations (publishing, user management, presence)
+* JWT token generation for authentication
+* Automatic reconnection handling
+* Context-aware operations
+* Built-in error handling and logging
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/centrifugo"
+----
+
+== Configuration
+
+=== Client Configuration
+
+[source,go]
+----
+type ClientConfig struct {
+    Url string  // WebSocket URL (e.g., "ws://localhost:8000/connection/websocket")
+}
+----
+
+=== Server Configuration
+
+[source,go]
+----
+type ServerConfig struct {
+    Host   string // gRPC host
+    Port   string // gRPC port
+    ApiKey string // API key for authentication
+    Secret string // Secret for JWT token generation
+}
+----
+
+== Client Usage
+
+The client connects via WebSocket for receiving real-time messages.
+
+=== Basic Setup
+
+[source,go]
+----
+// Configure client
+config := &centrifugo.ClientConfig{
+    Url: "ws://localhost:8000/connection/websocket",
+}
+
+// Create client
+client := centrifugo.NewClient(config, logger)
+
+// Generate connection token
+token, err := centrifugo.GenerateConnectToken(
+    ctx,
+    "your-secret",
+    "user123",
+    []string{"notifications"}, // auto-subscribe channels
+    time.Hour,                 // TTL
+    map[string]any{"role": "user"}, // user info
+)
+
+// Connect
+err = client.Connect(ctx, token)
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Close(ctx)
+----
+
+=== Channel Subscription
+
+[source,go]
+----
+// Generate subscription token for specific channel
+subToken, err := centrifugo.GenerateSubscribeToken(
+    ctx,
+    "your-secret",
+    "user123",
+    "user:123:notifications",
+    time.Hour,
+)
+
+// Subscribe to channel
+err = client.Subscribe(ctx, subToken, "user:123:notifications", func(pub centrifuge.Publication) error {
+    fmt.Printf("Received message: %s\n", string(pub.Data))
+    return nil
+})
+----
+
+=== Server-Side Subscriptions
+
+[source,go]
+----
+// Handle server-side publications (auto-subscribed channels)
+err = client.OnPublication(ctx, func(event centrifuge.ServerPublicationEvent) error {
+    fmt.Printf("Channel: %s, Message: %s\n", event.Channel, string(event.Publication.Data))
+    return nil
+})
+----
+
+== Server Usage
+
+The server uses gRPC for server-side operations like publishing messages and managing users.
+
+=== Basic Setup
+
+[source,go]
+----
+// Configure server
+config := &centrifugo.ServerConfig{
+    Host:   "localhost",
+    Port:   "10000",
+    ApiKey: "your-api-key",
+    Secret: "your-secret",
+}
+
+// Create server client
+server := centrifugo.NewServer(config, logger)
+
+// Connect to Centrifugo gRPC API
+err := server.Connect(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+defer server.Close(ctx)
+----
+
+=== Publishing Messages
+
+[source,go]
+----
+// Publish to single channel
+message := map[string]any{
+    "type":    "notification",
+    "title":   "New Message",
+    "content": "You have a new message!",
+}
+
+err := server.Publish(ctx, "user:123:notifications", message)
+if err != nil {
+    log.Printf("Failed to publish: %v", err)
+}
+----
+
+=== Batch Publishing
+
+[source,go]
+----
+// Publish same message to multiple channels
+channels := []string{
+    "user:123:notifications",
+    "user:456:notifications",
+    "admin:alerts",
+}
+
+err := server.BatchPublish(ctx, channels, message)
+if err != nil {
+    log.Printf("Failed to batch publish: %v", err)
+}
+----
+
+=== User Management
+
+[source,go]
+----
+// Disconnect user from all connections
+err := server.DisconnectUser(ctx, "user123")
+if err != nil {
+    log.Printf("Failed to disconnect user: %v", err)
+}
+----
+
+=== Presence Information
+
+[source,go]
+----
+// Get presence info for channel
+presence, err := server.GetPresence(ctx, "chat:room1")
+if err != nil {
+    log.Printf("Failed to get presence: %v", err)
+} else {
+    fmt.Printf("Users online: %d\n", len(presence.Presence))
+}
+----
+
+== Token Generation
+
+=== Connection Token
+
+[source,go]
+----
+token, err := centrifugo.GenerateConnectToken(
+    ctx,
+    "secret",                    // JWT secret
+    "user123",                   // User ID
+    []string{"notifications"},   // Auto-subscribe channels (optional)
+    time.Hour,                   // Token TTL
+    map[string]any{              // User info (optional)
+        "name": "John Doe",
+        "role": "user",
+    },
+)
+----
+
+=== Subscription Token
+
+[source,go]
+----
+token, err := centrifugo.GenerateSubscribeToken(
+    ctx,
+    "secret",           // JWT secret
+    "user123",          // User ID
+    "private:user123",  // Channel name
+    time.Hour,          // Token TTL
+)
+----
+
+== Complete Example
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+
+    "gitlab.com/algmib/kit"
+    "gitlab.com/algmib/kit/centrifugo"
+    "github.com/centrifugal/centrifuge-go"
+)
+
+func main() {
+    ctx := context.Background()
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    secret := "your-jwt-secret"
+
+    // Setup server client for publishing
+    serverConfig := &centrifugo.ServerConfig{
+        Host:   "localhost",
+        Port:   "10000",
+        ApiKey: "your-api-key",
+        Secret: secret,
+    }
+
+    server := centrifugo.NewServer(serverConfig, logger)
+    err := server.Connect(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer server.Close(ctx)
+
+    // Setup WebSocket client for receiving
+    clientConfig := &centrifugo.ClientConfig{
+        Url: "ws://localhost:8000/connection/websocket",
+    }
+
+    client := centrifugo.NewClient(clientConfig, logger)
+
+    // Generate connection token
+    connectToken, err := centrifugo.GenerateConnectToken(
+        ctx, secret, "user123",
+        []string{"notifications"},
+        time.Hour,
+        nil,
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Connect client
+    err = client.Connect(ctx, connectToken)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close(ctx)
+
+    // Handle server-side publications
+    client.OnPublication(ctx, func(event centrifuge.ServerPublicationEvent) error {
+        log.Printf("Received on %s: %s", event.Channel, string(event.Publication.Data))
+        return nil
+    })
+
+    // Publish a message from server
+    message := map[string]any{
+        "type": "welcome",
+        "text": "Hello from Centrifugo!",
+    }
+
+    err = server.Publish(ctx, "notifications", message)
+    if err != nil {
+        log.Printf("Failed to publish: %v", err)
+    }
+
+    // Keep running
+    time.Sleep(10 * time.Second)
+}
+----
+
+== Channel Patterns
+
+=== User-specific Channels
+[source,go]
+----
+channel := fmt.Sprintf("user:%s:notifications", userID)
+----
+
+=== Room/Group Channels
+[source,go]
+----
+channel := fmt.Sprintf("room:%s", roomID)
+channel := fmt.Sprintf("group:%s:messages", groupID)
+----
+
+=== Global Channels
+[source,go]
+----
+channel := "announcements"
+channel := "system:alerts"
+----
+
+== Best Practices
+
+1. **Token Security**: Keep JWT secrets secure and rotate them regularly
+2. **Channel Naming**: Use consistent, hierarchical channel naming patterns
+3. **Error Handling**: Always handle connection and subscription errors
+4. **Resource Cleanup**: Close connections when done
+5. **Presence Tracking**: Use presence for user status features
+6. **Message Size**: Keep messages reasonably sized for better performance
+7. **Reconnection**: The client handles reconnection automatically
+
+== Error Handling
+
+The package provides custom error codes for different operations. All errors include context information for debugging.
+
+[source,go]
+----
+if err != nil {
+    log.Printf("Centrifugo error: %v", err)
+    // Handle specific error cases as needed
+}
+----
+
+== Dependencies
+
+* Centrifuge Go client library
+* gRPC for server communication
+* ChatLab Kit utilities for logging and JWT
+
+== Thread Safety
+
+Both Client and Server are thread-safe and can be used concurrently from multiple goroutines.

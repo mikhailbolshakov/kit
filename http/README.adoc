@@ -1,0 +1,532 @@
+= HTTP Package
+
+A Go library for building HTTP servers and making HTTP client requests with built-in middleware, CORS support, WebSocket capabilities, and comprehensive request building utilities.
+
+== Features
+
+* **HTTP Server**: Production-ready server with middleware chain
+* **Request Builder**: Fluent API for HTTP client requests
+* **CORS Support**: Configurable cross-origin resource sharing
+* **WebSocket Support**: Built-in WebSocket upgrader
+* **Multipart Requests**: Easy multipart/form-data handling
+* **Tracing**: Configurable request/response tracing
+* **Auto-retry**: Automatic server restart on failures
+* **Context Support**: Full context awareness for all operations
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/http"
+----
+
+== HTTP Server
+
+=== Configuration
+
+[source,go]
+----
+type Config struct {
+    Port                 string
+    Cors                 *Cors
+    Trace                bool
+    TraceDetails         *TraceDetails
+    WriteTimeoutSec      int
+    ReadTimeoutSec       int
+    ReadBufferSizeBytes  int
+    WriteBufferSizeBytes int
+}
+
+type Cors struct {
+    Enabled        bool
+    AllowedHeaders []string
+    AllowedOrigins []string
+    AllowedMethods []string
+    Debug          bool
+}
+----
+
+=== Basic Server Setup
+
+[source,go]
+----
+config := &http.Config{
+    Port:            "8080",
+    WriteTimeoutSec: 30,
+    ReadTimeoutSec:  30,
+    Trace:           false,
+}
+
+server := http.NewHttpServer(config, logger)
+
+// Setup routes
+server.RootRouter.HandleFunc("/health", healthHandler).Methods("GET")
+server.RootRouter.HandleFunc("/api/users", getUsersHandler).Methods("GET")
+server.RootRouter.HandleFunc("/api/users", createUserHandler).Methods("POST")
+
+// Start server
+server.Listen()
+----
+
+=== With CORS Support
+
+[source,go]
+----
+config := &http.Config{
+    Port: "8080",
+    Cors: &http.Cors{
+        Enabled: true,
+        AllowedOrigins: []string{
+            "http://localhost:3000",
+            "https://myapp.com",
+        },
+        AllowedMethods: []string{
+            "GET", "POST", "PUT", "DELETE", "OPTIONS",
+        },
+        AllowedHeaders: []string{
+            "Authorization", "Content-Type", "X-Requested-With",
+        },
+        Debug: false,
+    },
+    WriteTimeoutSec: 30,
+    ReadTimeoutSec:  30,
+}
+
+server := http.NewHttpServer(config, logger)
+----
+
+=== With Request Tracing
+
+[source,go]
+----
+config := &http.Config{
+    Port:  "8080",
+    Trace: true,
+    TraceDetails: &http.TraceDetails{
+        RequestBody:  true, // Log request bodies
+        Response:     true, // Log responses
+        ResponseBody: true, // Log response bodies
+    },
+}
+
+server := http.NewHttpServer(config, logger)
+----
+
+== HTTP Client
+
+=== Basic Requests
+
+[source,go]
+----
+client := &http.Client{Timeout: 30 * time.Second}
+
+// Simple GET request
+var result map[string]interface{}
+err := http.NewRq().
+    Cl(client).
+    Url(http.NewUrl().Url("https://api.example.com").Path("users")).
+    Get().
+    FnJson(&result).
+    Do(ctx)
+
+if err != nil {
+    log.Printf("Request failed: %v", err)
+}
+----
+
+=== POST with JSON
+
+[source,go]
+----
+// Create JSON payload
+user := map[string]interface{}{
+    "name":  "John Doe",
+    "email": "john@example.com",
+}
+
+payload, err := http.CreateJsonReader(ctx, user)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Make POST request
+var response map[string]interface{}
+err = http.NewRq().
+    Cl(client).
+    Url(http.NewUrl().Url("https://api.example.com").Path("users")).
+    Post().
+    ContType("application/json").
+    Payload(payload).
+    FnJson(&response).
+    Do(ctx)
+----
+
+=== With Authentication
+
+[source,go]
+----
+// Bearer token
+err := http.NewRq().
+    Cl(client).
+    Url(http.NewUrl().Url("https://api.example.com").Path("profile")).
+    AuthBearer("your-access-token").
+    Get().
+    FnJson(&profile).
+    Do(ctx)
+
+// Basic auth
+err := http.NewRq().
+    Cl(client).
+    Url(http.NewUrl().Url("https://api.example.com").Path("admin")).
+    AuthBasic("username", "password").
+    Get().
+    FnJson(&data).
+    Do(ctx)
+----
+
+=== File Upload
+
+[source,go]
+----
+// Prepare files
+files := []*http.File{
+    {
+        Name: "document.pdf",
+        Data: fileReader,
+    },
+    {
+        Name: "image.jpg",
+        Data: imageReader,
+    },
+}
+
+// Create multipart request
+multipart, err := http.CreateMultipartRequestOnlyFiles(ctx, files)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Upload files
+err = http.NewRq().
+    Cl(client).
+    Url(http.NewUrl().Url("https://api.example.com").Path("upload")).
+    Post().
+    ContType(multipart.ContentType).
+    Payload(multipart.Body).
+    Do(ctx)
+----
+
+=== Streaming Response
+
+[source,go]
+----
+// Stream large response
+stream, err := http.NewRq().
+    Cl(client).
+    Url(http.NewUrl().Url("https://api.example.com").Path("large-file")).
+    Get().
+    Stream(ctx)
+
+if err != nil {
+    log.Fatal(err)
+}
+defer stream.Close()
+
+// Process streamed content
+buffer := make([]byte, 8192)
+for {
+    n, err := stream.Content.Read(buffer)
+    if err != nil {
+        if err == io.EOF {
+            break
+        }
+        log.Fatal(err)
+    }
+
+    // Process chunk
+    processChunk(buffer[:n])
+}
+----
+
+== Examples
+
+=== REST API Server
+
+[source,go]
+----
+func main() {
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    config := &http.Config{
+        Port: "8080",
+        Cors: &http.Cors{
+            Enabled:        true,
+            AllowedOrigins: []string{"*"},
+            AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+            AllowedHeaders: []string{"*"},
+        },
+        WriteTimeoutSec: 30,
+        ReadTimeoutSec:  30,
+        Trace:           true,
+    }
+
+    server := http.NewHttpServer(config, logger)
+
+    // Setup routes
+    api := server.RootRouter.PathPrefix("/api/v1").Subrouter()
+
+    api.HandleFunc("/users", handleGetUsers).Methods("GET")
+    api.HandleFunc("/users", handleCreateUser).Methods("POST")
+    api.HandleFunc("/users/{id}", handleGetUser).Methods("GET")
+    api.HandleFunc("/users/{id}", handleUpdateUser).Methods("PUT")
+    api.HandleFunc("/users/{id}", handleDeleteUser).Methods("DELETE")
+
+    fmt.Println("Server starting on port 8080")
+    server.Listen()
+}
+
+func handleGetUsers(w http.ResponseWriter, r *http.Request) {
+    users := []map[string]interface{}{
+        {"id": 1, "name": "John Doe", "email": "john@example.com"},
+        {"id": 2, "name": "Jane Smith", "email": "jane@example.com"},
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(users)
+}
+
+func handleCreateUser(w http.ResponseWriter, r *http.Request) {
+    var user map[string]interface{}
+    if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return
+    }
+
+    user["id"] = 3 // Simulate ID assignment
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(user)
+}
+----
+
+=== HTTP Client Service
+
+[source,go]
+----
+type APIClient struct {
+    baseURL string
+    client  http.HttpClient
+    token   string
+}
+
+func NewAPIClient(baseURL, token string) *APIClient {
+    return &APIClient{
+        baseURL: baseURL,
+        client:  &http.Client{Timeout: 30 * time.Second},
+        token:   token,
+    }
+}
+
+func (c *APIClient) GetUser(ctx context.Context, userID string) (*User, error) {
+    var user User
+
+    err := http.NewRq().
+        Cl(c.client).
+        Url(http.NewUrl().Url(c.baseURL).Pathf("users/%s", userID)).
+        AuthBearer(c.token).
+        Get().
+        FnJson(&user).
+        Do(ctx)
+
+    return &user, err
+}
+
+func (c *APIClient) CreateUser(ctx context.Context, user *User) error {
+    payload, err := http.CreateJsonReader(ctx, user)
+    if err != nil {
+        return err
+    }
+
+    return http.NewRq().
+        Cl(c.client).
+        Url(http.NewUrl().Url(c.baseURL).Path("users")).
+        AuthBearer(c.token).
+        Post().
+        ContType("application/json").
+        Payload(payload).
+        Do(ctx)
+}
+
+func (c *APIClient) UploadFile(ctx context.Context, filename string, data io.Reader) error {
+    files := []*http.File{
+        {Name: filename, Data: data},
+    }
+
+    multipart, err := http.CreateMultipartRequestOnlyFiles(ctx, files)
+    if err != nil {
+        return err
+    }
+
+    return http.NewRq().
+        Cl(c.client).
+        Url(http.NewUrl().Url(c.baseURL).Path("upload")).
+        AuthBearer(c.token).
+        Post().
+        ContType(multipart.ContentType).
+        Payload(multipart.Body).
+        Do(ctx)
+}
+----
+
+=== File Processing Service
+
+[source,go]
+----
+func processLargeFile(ctx context.Context, fileURL string) error {
+    client := &http.Client{Timeout: 5 * time.Minute}
+
+    stream, err := http.NewRq().
+        Cl(client).
+        Url(http.NewUrl().Url(fileURL)).
+        Get().
+        Stream(ctx)
+
+    if err != nil {
+        return err
+    }
+    defer stream.Close()
+
+    fmt.Printf("Processing file of size: %d bytes\n", stream.ContentLength)
+
+    // Process in chunks
+    buffer := make([]byte, 32*1024) // 32KB chunks
+    totalProcessed := int64(0)
+
+    for {
+        n, err := stream.Content.Read(buffer)
+        if err != nil {
+            if err == io.EOF {
+                break
+            }
+            return err
+        }
+
+        // Process chunk
+        if err := processChunk(buffer[:n]); err != nil {
+            return err
+        }
+
+        totalProcessed += int64(n)
+
+        // Progress tracking
+        if stream.ContentLength > 0 {
+            progress := float64(totalProcessed) / float64(stream.ContentLength) * 100
+            fmt.Printf("Progress: %.1f%%\n", progress)
+        }
+    }
+
+    fmt.Println("File processing completed")
+    return nil
+}
+
+func processChunk(data []byte) error {
+    // Implement your chunk processing logic
+    time.Sleep(10 * time.Millisecond) // Simulate processing
+    return nil
+}
+----
+
+== WebSocket Support
+
+[source,go]
+----
+// WebSocket handler
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+    conn, err := server.WsUpgrader.Upgrade(w, r, nil)
+    if err != nil {
+        log.Printf("WebSocket upgrade failed: %v", err)
+        return
+    }
+    defer conn.Close()
+
+    for {
+        messageType, message, err := conn.ReadMessage()
+        if err != nil {
+            log.Printf("WebSocket read error: %v", err)
+            break
+        }
+
+        // Echo message back
+        if err := conn.WriteMessage(messageType, message); err != nil {
+            log.Printf("WebSocket write error: %v", err)
+            break
+        }
+    }
+}
+
+// Register WebSocket route
+server.RootRouter.HandleFunc("/ws", handleWebSocket)
+----
+
+== URL Building
+
+[source,go]
+----
+// Build complex URLs
+url := http.NewUrl().
+    Url("https://api.example.com").
+    Path("search").
+    Params(map[string]string{
+        "q":     "golang",
+        "limit": "10",
+        "sort":  "date",
+    }).
+    String()
+
+// Result: https://api.example.com/search?q=golang&limit=10&sort=date
+----
+
+== Error Handling
+
+[source,go]
+----
+// Custom error handling
+err := http.NewRq().
+    Cl(client).
+    Url(url).
+    ErrCodeFn(func(ctx context.Context, code int, data []byte) error {
+        switch code {
+        case 404:
+            return fmt.Errorf("resource not found")
+        case 401:
+            return fmt.Errorf("unauthorized access")
+        default:
+            return fmt.Errorf("HTTP %d: %s", code, string(data))
+        }
+    }).
+    Do(ctx)
+----
+
+== Best Practices
+
+1. **Timeouts**: Always set appropriate timeouts for HTTP clients
+2. **Context Usage**: Use context for cancellation and timeouts
+3. **Resource Cleanup**: Close streams and response bodies properly
+4. **CORS Configuration**: Configure CORS appropriately for your security needs
+5. **Error Handling**: Implement proper error handling for different HTTP status codes
+6. **Request Tracing**: Use tracing only for debugging (impacts performance)
+7. **Streaming**: Use streaming for large responses to manage memory usage
+
+== Dependencies
+
+* Gorilla Mux for routing
+* Gorilla WebSocket for WebSocket support
+* RS CORS for CORS handling
+* ChatLab Kit utilities for logging and error handling
+
+== Thread Safety
+
+Both HTTP server and client components are thread-safe and designed for concurrent use in production environments.

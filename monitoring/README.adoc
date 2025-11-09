@@ -1,0 +1,177 @@
+= Monitoring Package
+
+A Go library for exposing application metrics via Prometheus, providing simple HTTP server setup for metrics collection and monitoring with support for custom and built-in Go metrics.
+
+== Features
+
+* Prometheus metrics HTTP server
+* Custom metrics collection support
+* Built-in Go runtime and process metrics
+* Configurable endpoint and port
+* Automatic metrics registration
+* Goroutine-based async server startup
+* Support for multiple metrics providers
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/monitoring"
+----
+
+== Basic Usage
+
+=== Simple Metrics Server
+
+[source,go]
+----
+package main
+
+import (
+    "log"
+
+    "gitlab.com/algmib/kit/monitoring"
+)
+
+func main() {
+    // Create metrics server
+    server := monitoring.NewMetricsServer(logger)
+
+    // Configure server
+    config := &monitoring.Config{
+        Enabled:   true,
+        Port:      "9090",
+        UrlPath:   "/metrics",
+        GoMetrics: true, // Include Go runtime metrics
+    }
+
+    // Initialize server
+    err := server.Init(config)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Start listening (async)
+    server.Listen()
+
+    // Your application logic here...
+
+    // Cleanup
+    defer server.Close()
+}
+----
+
+=== Custom Metrics Provider
+
+[source,go]
+----
+package main
+
+import (
+    "log"
+
+    "github.com/prometheus/client_golang/prometheus"
+    "gitlab.com/algmib/kit/monitoring"
+)
+
+type AppMetrics struct {
+    requestsTotal   prometheus.Counter
+    requestDuration prometheus.Histogram
+}
+
+func NewAppMetrics() *AppMetrics {
+    return &AppMetrics{
+        requestsTotal: prometheus.NewCounter(prometheus.CounterOpts{
+            Name: "app_requests_total",
+            Help: "Total number of requests",
+        }),
+        requestDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+            Name: "app_request_duration_seconds",
+            Help: "Request duration in seconds",
+        }),
+    }
+}
+
+// Implement MetricsProvider interface
+func (m *AppMetrics) GetCollector() monitoring.MetricsCollector {
+    return func() monitoring.MetricsCollection {
+        return monitoring.MetricsCollection{
+            m.requestsTotal,
+            m.requestDuration,
+        }
+    }
+}
+
+func main() {
+    // Create metrics server and custom metrics
+    server := monitoring.NewMetricsServer(logger)
+    appMetrics := NewAppMetrics()
+
+    // Configure with custom metrics provider
+    config := &monitoring.Config{
+        Enabled:   true,
+        Port:      "9090",
+        GoMetrics: true,
+    }
+
+    // Initialize with metrics provider
+    err := server.Init(config, appMetrics)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Start server
+    server.Listen()
+
+    // Use metrics in your application
+    appMetrics.requestsTotal.Inc()
+    appMetrics.requestDuration.Observe(0.5)
+
+    defer server.Close()
+}
+----
+
+== Configuration
+
+[source,go]
+----
+config := &monitoring.Config{
+    Enabled:   true,        // Enable/disable monitoring
+    Port:      "9090",      // Port to listen on
+    UrlPath:   "/metrics",  // Metrics endpoint path
+    GoMetrics: true,        // Include Go runtime metrics
+}
+----
+
+== Error Handling
+
+[source,go]
+----
+// Initialize server with error handling
+err := server.Init(config, metricsProvider)
+if err != nil {
+    log.Printf("Failed to initialize metrics server: %v", err)
+    return
+}
+
+// Server will handle HTTP errors internally
+server.Listen()
+----
+
+== Metrics Access
+
+Once running, metrics are available at:
+[source,text]
+----
+http://localhost:9090/metrics
+----
+
+== Dependencies
+
+* `github.com/prometheus/client_golang/prometheus` - Prometheus client library
+* `github.com/gorilla/mux` - HTTP router
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+The metrics server is thread-safe and metrics can be updated concurrently from multiple goroutines.

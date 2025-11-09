@@ -1,0 +1,571 @@
+= Kafka Package
+
+A Go library for Apache Kafka integration providing producers, subscribers, and broker management with built-in SASL authentication, automatic topic creation, and comprehensive error handling.
+
+== Features
+
+* **Kafka Producer**: Send messages with batching and retry capabilities
+* **Kafka Subscriber**: Consume messages with worker pools and manual/auto commit
+* **Topic Management**: Automatic topic creation and configuration
+* **SASL Authentication**: Support for Plain, SCRAM-SHA-256, and SCRAM-SHA-512
+* **Dead Letter Queue**: Failed message handling with DLQ support
+* **Manual Commit**: Fine-grained control over message acknowledgment
+* **Load Balancing**: Consumer groups for distributed processing
+* **Context Support**: Full context awareness for all operations
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/kafka"
+----
+
+== Configuration
+
+=== Broker Configuration
+
+[source,go]
+----
+type BrokerConfig struct {
+    ClientId          string // Client identifier
+    TopicAutoCreation bool   // Automatically create topics
+    Url               string // Comma-separated broker URLs
+    Sasl              Sasl   // SASL authentication config
+}
+
+type Sasl struct {
+    Enabled  bool   // Enable SASL authentication
+    Type     string // "plain", "sha256", "sha512"
+    Username string
+    Password string
+}
+----
+
+=== Topic Configuration
+
+[source,go]
+----
+type TopicConfig struct {
+    Topic         string // Topic name
+    Partitions    int    // Number of partitions
+    ReplicaFactor int    // Replication factor
+}
+----
+
+== Basic Setup
+
+=== Initialize Broker
+
+[source,go]
+----
+// Create broker
+broker := kafka.NewBroker(logger)
+
+// Configure broker
+config := &kafka.BrokerConfig{
+    ClientId:          "my-service",
+    TopicAutoCreation: true,
+    Url:               "localhost:9092",
+}
+
+// Initialize
+err := broker.Init(ctx, config)
+if err != nil {
+    log.Fatal(err)
+}
+defer broker.Close(ctx)
+----
+
+=== With SASL Authentication
+
+[source,go]
+----
+config := &kafka.BrokerConfig{
+    ClientId:          "my-service",
+    TopicAutoCreation: true,
+    Url:               "localhost:9092",
+    Sasl: kafka.Sasl{
+        Enabled:  true,
+        Type:     kafka.SaslTypeScramSha256,
+        Username: "kafka-user",
+        Password: "kafka-password",
+    },
+}
+
+err := broker.Init(ctx, config)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+== Producer
+
+=== Basic Producer
+
+[source,go]
+----
+// Configure topic
+topic := &kafka.TopicConfig{
+    Topic:         "user-events",
+    Partitions:    3,
+    ReplicaFactor: 1,
+}
+
+// Configure producer
+producerConfig := kafka.NewProducerCfgBuilder().
+    BatchSize(100).
+    BatchTimeout(1 * time.Second).
+    RequiredAcks(1).
+    Build()
+
+// Add producer
+producer, err := broker.AddProducer(ctx, topic, producerConfig)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== Send Messages
+
+[source,go]
+----
+// Single message
+message := map[string]interface{}{
+    "userId":    "123",
+    "action":    "login",
+    "timestamp": time.Now(),
+}
+
+err := producer.Send(ctx, "user-123", message)
+if err != nil {
+    log.Printf("Failed to send message: %v", err)
+}
+----
+
+=== Batch Messages
+
+[source,go]
+----
+// Multiple messages
+messages := []*kafka.Message{
+    {Key: "user-1", Payload: map[string]string{"action": "login"}},
+    {Key: "user-2", Payload: map[string]string{"action": "logout"}},
+    {Key: "user-3", Payload: map[string]string{"action": "purchase"}},
+}
+
+err := producer.SendMany(ctx, messages...)
+if err != nil {
+    log.Printf("Failed to send batch: %v", err)
+}
+----
+
+== Subscriber
+
+=== Basic Subscriber
+
+[source,go]
+----
+// Configure subscriber
+subscriberConfig := kafka.NewSubscriberCfgBuilder().
+    GroupId("user-service-group").
+    Workers(4).
+    BatchTimeout(10 * time.Second).
+    MaxWait(5 * time.Second).
+    Build()
+
+// Message handler
+handler := func(payload []byte) error {
+    var message map[string]interface{}
+    if err := json.Unmarshal(payload, &message); err != nil {
+        return err
+    }
+
+    fmt.Printf("Processing message: %+v\n", message)
+
+    // Process your message here
+    return processUserEvent(message)
+}
+
+// Add subscriber
+err := broker.AddSubscriber(ctx, topic, subscriberConfig, handler)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== Multiple Handlers
+
+[source,go]
+----
+// Multiple handlers for the same topic
+handler1 := func(payload []byte) error {
+    // Handle analytics
+    return processAnalytics(payload)
+}
+
+handler2 := func(payload []byte) error {
+    // Handle notifications
+    return sendNotification(payload)
+}
+
+err := broker.AddSubscriber(ctx, topic, subscriberConfig, handler1, handler2)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+=== Manual Commit
+
+[source,go]
+----
+// Configure manual commit
+subscriberConfig := kafka.NewSubscriberCfgBuilder().
+    GroupId("processing-group").
+    CommitInterval(0). // 0 = manual commit
+    ManualCommitHandleMessageMaxRetryCount(3).
+    ManualCommitHandleMessageRetryBackoffStepMs(1000).
+    Workers(2).
+    Build()
+
+// Validate configuration
+err := subscriberConfig.Validate(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+
+handler := func(payload []byte) error {
+    // Process message
+    if err := processMessage(payload); err != nil {
+        return err // Will retry up to MaxRetryCount
+    }
+
+    // Message will be committed only if no error returned
+    return nil
+}
+
+err = broker.AddSubscriber(ctx, topic, subscriberConfig, handler)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+== Dead Letter Queue
+
+=== Setup DLQ Producer
+
+[source,go]
+----
+// Create DLQ topic
+dlqTopic := &kafka.TopicConfig{
+    Topic:         "user-events-dlq",
+    Partitions:    1,
+    ReplicaFactor: 1,
+}
+
+// Create DLQ producer
+dlqProducerConfig := kafka.NewProducerCfgBuilder().
+    BatchSize(10).
+    Build()
+
+dlqProducer, err := broker.AddProducer(ctx, dlqTopic, dlqProducerConfig)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Configure subscriber with DLQ
+subscriberConfig := kafka.NewSubscriberCfgBuilder().
+    GroupId("main-group").
+    CommitInterval(0). // Manual commit required for DLQ
+    ManualCommitHandleMessageMaxRetryCount(3).
+    DLQProducer(dlqProducer).
+    Build()
+
+// Handler that may fail
+handler := func(payload []byte) error {
+    // Simulate processing that might fail
+    if shouldFail(payload) {
+        return fmt.Errorf("processing failed")
+    }
+
+    return processMessage(payload)
+}
+
+err = broker.AddSubscriber(ctx, topic, subscriberConfig, handler)
+if err != nil {
+    log.Fatal(err)
+}
+----
+
+== Complete Examples
+
+=== Event-Driven Microservice
+
+[source,go]
+----
+func main() {
+    ctx := context.Background()
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    // Initialize broker
+    broker := kafka.NewBroker(logger)
+
+    config := &kafka.BrokerConfig{
+        ClientId:          "user-service",
+        TopicAutoCreation: true,
+        Url:               "localhost:9092",
+    }
+
+    if err := broker.Init(ctx, config); err != nil {
+        log.Fatal(err)
+    }
+    defer broker.Close(ctx)
+
+    // Setup topics
+    userEventsTopic := &kafka.TopicConfig{
+        Topic:         "user-events",
+        Partitions:    3,
+        ReplicaFactor: 1,
+    }
+
+    orderEventsTopic := &kafka.TopicConfig{
+        Topic:         "order-events",
+        Partitions:    2,
+        ReplicaFactor: 1,
+    }
+
+    // Setup producer
+    producerConfig := kafka.NewProducerCfgBuilder().
+        BatchSize(50).
+        BatchTimeout(2 * time.Second).
+        RequiredAcks(1).
+        Build()
+
+    userProducer, err := broker.AddProducer(ctx, userEventsTopic, producerConfig)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Setup subscribers
+    subscriberConfig := kafka.NewSubscriberCfgBuilder().
+        GroupId("user-processor").
+        Workers(4).
+        Build()
+
+    // User events handler
+    userHandler := func(payload []byte) error {
+        var event UserEvent
+        if err := json.Unmarshal(payload, &event); err != nil {
+            return err
+        }
+
+        return handleUserEvent(&event)
+    }
+
+    // Order events handler
+    orderHandler := func(payload []byte) error {
+        var event OrderEvent
+        if err := json.Unmarshal(payload, &event); err != nil {
+            return err
+        }
+
+        return handleOrderEvent(&event)
+    }
+
+    // Add subscribers
+    if err := broker.AddSubscriber(ctx, userEventsTopic, subscriberConfig, userHandler); err != nil {
+        log.Fatal(err)
+    }
+
+    if err := broker.AddSubscriber(ctx, orderEventsTopic, subscriberConfig, orderHandler); err != nil {
+        log.Fatal(err)
+    }
+
+    // Start broker
+    if err := broker.Start(ctx); err != nil {
+        log.Fatal(err)
+    }
+
+    // Simulate producing events
+    go func() {
+        for i := 0; i < 100; i++ {
+            event := UserEvent{
+                UserID:    fmt.Sprintf("user-%d", i),
+                Action:    "login",
+                Timestamp: time.Now(),
+            }
+
+            if err := userProducer.Send(ctx, event.UserID, event); err != nil {
+                log.Printf("Failed to send event: %v", err)
+            }
+
+            time.Sleep(time.Second)
+        }
+    }()
+
+    // Keep running
+    select {}
+}
+
+type UserEvent struct {
+    UserID    string    `json:"user_id"`
+    Action    string    `json:"action"`
+    Timestamp time.Time `json:"timestamp"`
+}
+
+type OrderEvent struct {
+    OrderID   string    `json:"order_id"`
+    UserID    string    `json:"user_id"`
+    Amount    float64   `json:"amount"`
+    Status    string    `json:"status"`
+}
+
+func handleUserEvent(event *UserEvent) error {
+    fmt.Printf("Processing user event: %+v\n", event)
+    // Implement your business logic
+    return nil
+}
+
+func handleOrderEvent(event *OrderEvent) error {
+    fmt.Printf("Processing order event: %+v\n", event)
+    // Implement your business logic
+    return nil
+}
+----
+
+=== High-Throughput Producer
+
+[source,go]
+----
+func setupHighThroughputProducer(broker kafka.Broker) (kafka.Producer, error) {
+    topic := &kafka.TopicConfig{
+        Topic:         "high-volume-events",
+        Partitions:    10,
+        ReplicaFactor: 3,
+    }
+
+    // Optimized for high throughput
+    config := kafka.NewProducerCfgBuilder().
+        BatchSize(1000).                    // Large batches
+        BatchTimeout(100 * time.Millisecond). // Quick batching
+        RequiredAcks(1).                    // Single acknowledgment
+        Async(false).                       // Synchronous for error handling
+        Retry(5, 2 * time.Second).         // Retry configuration
+        Build()
+
+    return broker.AddProducer(context.Background(), topic, config)
+}
+----
+
+=== Resilient Subscriber with DLQ
+
+[source,go]
+----
+func setupResilientSubscriber(broker kafka.Broker) error {
+    ctx := context.Background()
+
+    // Main topic
+    mainTopic := &kafka.TopicConfig{
+        Topic:         "critical-events",
+        Partitions:    5,
+        ReplicaFactor: 2,
+    }
+
+    // Dead letter queue topic
+    dlqTopic := &kafka.TopicConfig{
+        Topic:         "critical-events-dlq",
+        Partitions:    1,
+        ReplicaFactor: 2,
+    }
+
+    // DLQ producer
+    dlqConfig := kafka.NewProducerCfgBuilder().
+        BatchSize(1).
+        RequiredAcks(-1). // All replicas
+        Build()
+
+    dlqProducer, err := broker.AddProducer(ctx, dlqTopic, dlqConfig)
+    if err != nil {
+        return err
+    }
+
+    // Subscriber with comprehensive retry and DLQ
+    config := kafka.NewSubscriberCfgBuilder().
+        GroupId("critical-processor").
+        Workers(3).
+        CommitInterval(0). // Manual commit
+        ManualCommitHandleMessageMaxRetryCount(5).
+        ManualCommitHandleMessageRetryBackoffStepMs(2000).
+        ManualCommitMessageMaxRetryCount(3).
+        DLQProducer(dlqProducer).
+        Build()
+
+    if err := config.Validate(ctx); err != nil {
+        return err
+    }
+
+    handler := func(payload []byte) error {
+        // Critical message processing
+        return processCriticalMessage(payload)
+    }
+
+    return broker.AddSubscriber(ctx, mainTopic, config, handler)
+}
+
+func processCriticalMessage(payload []byte) error {
+    // Implement critical business logic
+    // Return error to trigger retry/DLQ logic
+    return nil
+}
+----
+
+== Configuration Builders
+
+=== Producer Configuration
+
+[source,go]
+----
+config := kafka.NewProducerCfgBuilder().
+    BatchSize(500).                      // Messages per batch
+    BatchTimeout(5 * time.Second).       // Max wait time
+    RequiredAcks(1).                     // Acknowledgment level (0, 1, -1)
+    Async(false).                        // Synchronous/asynchronous
+    Retry(3, 1 * time.Second).          // Retry attempts and delay
+    Build()
+----
+
+=== Subscriber Configuration
+
+[source,go]
+----
+config := kafka.NewSubscriberCfgBuilder().
+    GroupId("my-consumer-group").
+    Workers(8).                          // Parallel workers
+    BatchTimeout(10 * time.Second).      // Batch fetch timeout
+    MaxWait(5 * time.Second).           // Max wait for new data
+    CommitInterval(1 * time.Second).     // Auto commit interval (0 = manual)
+    StartOffset(kafka.LastOffset).       // Start from latest
+    JoinGroupBackoff(2 * time.Second).  // Rejoin delay
+    Logging(true).                       // Enable logging
+    Build()
+----
+
+== Best Practices
+
+1. **Topic Design**: Use appropriate partition counts and replication factors
+2. **Consumer Groups**: Use consumer groups for load balancing
+3. **Manual Commit**: Use manual commit for critical message processing
+4. **Dead Letter Queue**: Implement DLQ for failed message handling
+5. **Batch Configuration**: Tune batch sizes for your throughput requirements
+6. **Error Handling**: Implement proper error handling in message handlers
+7. **Resource Cleanup**: Always close the broker on application shutdown
+
+== Dependencies
+
+* Segmentio Kafka Go client
+* ChatLab Kit utilities for logging and context management
+
+== Thread Safety
+
+The Kafka broker and all producers/subscribers are thread-safe and designed for concurrent use in production environments.

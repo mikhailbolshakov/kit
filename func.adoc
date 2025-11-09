@@ -1,0 +1,393 @@
+= Kit Functional Utilities
+
+A Go library providing functional programming utilities with generics support, including slice transformations, map operations, filtering, grouping, and set operations for cleaner and more expressive data processing.
+
+== Features
+
+* Generic slice transformations (Map, Filter, Reduce)
+* Slice conversion and grouping operations
+* Map manipulation utilities
+* Set operations with intersection and difference
+* Type-safe functional programming patterns
+* Memory-efficient operations with pre-allocated slices
+* Null-safe operations
+* Distinct and deduplication utilities
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit"
+----
+
+== Basic Usage
+
+=== Slice Transformations
+
+[source,go]
+----
+package main
+
+import (
+    "fmt"
+    "strconv"
+    "strings"
+
+    "gitlab.com/algmib/kit"
+)
+
+type User struct {
+    ID    int
+    Name  string
+    Email string
+    Age   int
+    Active bool
+}
+
+func main() {
+    users := []User{
+        {ID: 1, Name: "John Doe", Email: "john@example.com", Age: 30, Active: true},
+        {ID: 2, Name: "Jane Smith", Email: "jane@example.com", Age: 25, Active: false},
+        {ID: 3, Name: "Bob Johnson", Email: "bob@example.com", Age: 35, Active: true},
+        {ID: 4, Name: "Alice Brown", Email: "alice@example.com", Age: 28, Active: true},
+    }
+
+    // Map: Extract user emails
+    emails := kit.Map(users, func(user User) string {
+        return user.Email
+    })
+    fmt.Printf("User emails: %v\n", emails)
+
+    // Filter: Get only active users
+    activeUsers := kit.Filter(users, func(user User) bool {
+        return user.Active
+    })
+    fmt.Printf("Active users count: %d\n", len(activeUsers))
+
+    // GroupBy: Group users by age ranges
+    ageGroups := kit.GroupBy(users, func(user User) string {
+        if user.Age < 30 {
+            return "young"
+        }
+        return "mature"
+    })
+
+    fmt.Printf("Age groups:\n")
+    for group, userList := range ageGroups {
+        fmt.Printf("  %s: %d users\n", group, len(userList))
+    }
+
+    // Convert slice to map by ID
+    userMap := kit.SliceToMap(users, func(user User) int {
+        return user.ID
+    })
+
+    // Find user by ID
+    if user, exists := userMap[2]; exists {
+        fmt.Printf("Found user: %s\n", user.Name)
+    }
+
+    // ForAll: Print all user names
+    fmt.Println("All users:")
+    kit.ForAll(users, func(user User) {
+        fmt.Printf("- %s\n", user.Name)
+    })
+}
+----
+
+=== Advanced Data Processing
+
+[source,go]
+----
+package main
+
+import (
+    "fmt"
+    "sort"
+    "strings"
+
+    "gitlab.com/algmib/kit"
+)
+
+type Order struct {
+    ID       int
+    UserID   int
+    Amount   float64
+    Status   string
+    Category string
+}
+
+type OrderSummary struct {
+    TotalAmount float64
+    OrderCount  int
+    Categories  []string
+}
+
+func main() {
+    orders := []Order{
+        {ID: 1, UserID: 1, Amount: 100.0, Status: "completed", Category: "electronics"},
+        {ID: 2, UserID: 2, Amount: 50.0, Status: "pending", Category: "books"},
+        {ID: 3, UserID: 1, Amount: 200.0, Status: "completed", Category: "electronics"},
+        {ID: 4, UserID: 3, Amount: 75.0, Status: "completed", Category: "clothing"},
+        {ID: 5, UserID: 2, Amount: 25.0, Status: "completed", Category: "books"},
+        {ID: 6, UserID: 1, Amount: 150.0, Status: "cancelled", Category: "electronics"},
+    }
+
+    // Reduce: Calculate order summaries by user
+    userSummaries := kit.Reduce(orders,
+        func(order Order) int { return order.UserID },
+        func(order Order, summary OrderSummary) OrderSummary {
+            if order.Status == "completed" {
+                summary.TotalAmount += order.Amount
+                summary.OrderCount++
+
+                // Add category if not exists
+                found := false
+                for _, cat := range summary.Categories {
+                    if cat == order.Category {
+                        found = true
+                        break
+                    }
+                }
+                if !found {
+                    summary.Categories = append(summary.Categories, order.Category)
+                }
+            }
+            return summary
+        })
+
+    fmt.Println("Order summaries by user:")
+    for userID, summary := range userSummaries {
+        fmt.Printf("User %d: %.2f total, %d orders, categories: %v\n",
+            userID, summary.TotalAmount, summary.OrderCount, summary.Categories)
+    }
+
+    // ConvertSlice: Convert orders to pointers and transform
+    orderPtrs := []*Order{}
+    for i := range orders {
+        orderPtrs = append(orderPtrs, &orders[i])
+    }
+
+    orderDescriptions := kit.ConvertSlice(orderPtrs, func(order *Order) *string {
+        desc := fmt.Sprintf("Order #%d: $%.2f (%s)", order.ID, order.Amount, order.Status)
+        return &desc
+    })
+
+    fmt.Println("Order descriptions:")
+    for _, desc := range orderDescriptions {
+        fmt.Printf("- %s\n", *desc)
+    }
+
+    // First: Find first high-value order
+    highValueOrder := kit.First(orderPtrs, func(order *Order) bool {
+        return order.Amount > 100.0 && order.Status == "completed"
+    })
+
+    if highValueOrder != nil {
+        fmt.Printf("First high-value order: #%d (%.2f)\n",
+            highValueOrder.ID, highValueOrder.Amount)
+    }
+
+    // Set operations: Find unique categories
+    allCategories := kit.Map(orders, func(order Order) string {
+        return order.Category
+    })
+
+    uniqueCategories := kit.Distinct(allCategories)
+    fmt.Printf("Unique categories: %v\n", uniqueCategories)
+
+    // Map operations
+    categorySet := kit.ToSet(uniqueCategories, func(cat string) string {
+        return cat
+    })
+
+    categoryList := kit.FromSet(categorySet)
+    sort.Strings(categoryList)
+    fmt.Printf("Sorted categories: %v\n", categoryList)
+}
+----
+
+== Slice Operations
+
+[source,go]
+----
+// Map transformation
+numbers := []int{1, 2, 3, 4, 5}
+strings := kit.Map(numbers, func(n int) string {
+    return fmt.Sprintf("num_%d", n)
+})
+
+// Filter elements
+evenNumbers := kit.Filter(numbers, func(n int) bool {
+    return n%2 == 0
+})
+
+// Group by condition
+grouped := kit.GroupBy(numbers, func(n int) string {
+    if n%2 == 0 {
+        return "even"
+    }
+    return "odd"
+})
+
+// Convert to map
+numberMap := kit.SliceToMap(numbers, func(n int) int {
+    return n * 10 // Use as key
+})
+
+// Get distinct values
+duplicates := []string{"a", "b", "a", "c", "b", "d"}
+unique := kit.Distinct(duplicates)
+// Result: ["a", "b", "c", "d"]
+----
+
+== Map Operations
+
+[source,go]
+----
+userScores := map[string]int{
+    "alice":   95,
+    "bob":     87,
+    "charlie": 92,
+}
+
+// Extract values
+scores := kit.MapValues(userScores)
+// Result: [95, 87, 92] (order not guaranteed)
+
+// Extract keys
+users := kit.MapKeys(userScores)
+// Result: ["alice", "bob", "charlie"] (order not guaranteed)
+
+// Transform map to slice
+rankings := kit.MapSet(userScores, func(name string, score int) string {
+    return fmt.Sprintf("%s: %d", name, score)
+})
+// Result: ["alice: 95", "bob: 87", "charlie: 92"]
+----
+
+== Set Operations
+
+[source,go]
+----
+list1 := []string{"a", "b", "c", "d"}
+list2 := []string{"c", "d", "e", "f"}
+
+// Left exclusive (elements in list1 but not in list2)
+diff := kit.LeftExclusive(list1, list2)
+// Result: ["a", "b"]
+
+// Check intersection
+hasCommon := kit.ContainsIntersection(list1, list2)
+// Result: true (both contain "c" and "d")
+
+// Convert to set
+set := kit.ToSet(list1, func(s string) string { return s })
+// Result: map[string]struct{}{"a":{}, "b":{}, "c":{}, "d":{}}
+
+// Convert back from set
+backToSlice := kit.FromSet(set)
+// Result: ["a", "b", "c", "d"] (order not guaranteed)
+----
+
+== Reduce Operations
+
+[source,go]
+----
+type Sale struct {
+    Region string
+    Amount float64
+}
+
+sales := []Sale{
+    {Region: "North", Amount: 1000},
+    {Region: "South", Amount: 1500},
+    {Region: "North", Amount: 800},
+    {Region: "East", Amount: 1200},
+}
+
+// Group and sum by region
+regionalTotals := kit.Reduce(sales,
+    func(sale Sale) string { return sale.Region },
+    func(sale Sale, total float64) float64 {
+        return total + sale.Amount
+    })
+
+// Result: map[string]float64{"North": 1800, "South": 1500, "East": 1200}
+----
+
+== Utility Functions
+
+[source,go]
+----
+// Get default value for type
+defaultInt := kit.GetDefault[int]()        // 0
+defaultString := kit.GetDefault[string]()  // ""
+defaultSlice := kit.GetDefault[[]int]()    // nil
+
+// Null-safe map checking
+var status *string = nil
+validStatuses := map[string]struct{}{"active": {}, "inactive": {}}
+
+isValid := kit.NilOrInMap(status, validStatuses)
+// Result: true (nil is considered valid)
+
+status = kit.StringPtr("active")
+isValid = kit.NilOrInMap(status, validStatuses)
+// Result: true ("active" is in map)
+
+// Execute function on all elements
+users := []string{"alice", "bob", "charlie"}
+kit.ForAll(users, func(user string) {
+    fmt.Printf("Hello, %s!\n", user)
+})
+----
+
+== Type Safety
+
+[source,go]
+----
+// All functions are type-safe with generics
+type CustomType struct {
+    Value int
+}
+
+items := []CustomType{{1}, {2}, {3}}
+
+// Compiler ensures type safety
+mapped := kit.Map(items, func(item CustomType) string {
+    return fmt.Sprintf("value_%d", item.Value)
+})
+// Type: []string
+
+filtered := kit.Filter(items, func(item CustomType) bool {
+    return item.Value > 1
+})
+// Type: []CustomType
+----
+
+== Performance Considerations
+
+[source,go]
+----
+// Functions pre-allocate slices when possible for better performance
+largeSlice := make([]int, 10000)
+for i := range largeSlice {
+    largeSlice[i] = i
+}
+
+// Efficient memory allocation
+transformed := kit.Map(largeSlice, func(i int) string {
+    return fmt.Sprintf("item_%d", i)
+})
+// Pre-allocates slice with capacity 10000
+----
+
+== Dependencies
+
+* No external dependencies - uses only Go standard library
+* Requires Go 1.18+ for generics support
+
+== Thread Safety
+
+All functional utilities are thread-safe for concurrent read operations. However, modifying the source slices concurrently while using these functions is not safe and requires external synchronization.

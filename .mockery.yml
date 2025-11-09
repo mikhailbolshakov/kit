@@ -1,0 +1,19 @@
+all: true
+dir: ./mocks
+force-file-write: true
+formatter: goimports
+log-level: error
+structname: '{{.InterfaceName}}'
+recursive: true
+require-template-schema-exists: true
+template: testify
+template-schema: '{{.Template}}.schema.json'
+pkgname: mocks
+packages:
+  gitlab.com/algmib/kit:
+    config:
+      all: true
+      pkgname: mocks
+      filename: '{{.SrcPackageName}}_mocks.go'
+      structname: '{{firstUpper .SrcPackageName}}{{.InterfaceName}}'
+      dir: "mocks"

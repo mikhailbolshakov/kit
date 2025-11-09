@@ -1,0 +1,294 @@
+= MongoDB Package
+
+A Go library for MongoDB database connectivity, providing simple connection management with support for TLS/SSL connections, configurable timeouts, and built-in logging and error handling.
+
+== Features
+
+* MongoDB database connection management
+* TLS/SSL certificate support
+* Configurable connection timeouts
+* Built-in logging and error handling
+* Context-aware operations
+* Automatic connection cleanup
+* Support for MongoDB connection strings
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/mongodb"
+----
+
+== Basic Usage
+
+=== Simple Connection Setup
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+
+    "gitlab.com/algmib/kit/mongodb"
+    "go.mongodb.org/mongo-driver/bson"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Configure MongoDB connection
+    timeoutSec := 30
+    config := &mongodb.Config{
+        ConnectionString: "mongodb://localhost:27017",
+        TimeoutSec:       &timeoutSec,
+    }
+
+    // Open connection
+    storage, err := mongodb.Open(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer storage.Close(ctx)
+
+    // Get database and collection
+    db := storage.Instance.Database("myapp")
+    collection := db.Collection("users")
+
+    // Insert document
+    user := bson.M{
+        "name":  "John Doe",
+        "email": "john@example.com",
+        "age":   30,
+    }
+
+    result, err := collection.InsertOne(ctx, user)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Inserted document with ID: %v", result.InsertedID)
+
+    // Find document
+    var foundUser bson.M
+    err = collection.FindOne(ctx, bson.M{"email": "john@example.com"}).Decode(&foundUser)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Found user: %+v", foundUser)
+}
+----
+
+=== Secure Connection with TLS
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+
+    "gitlab.com/algmib/kit/mongodb"
+    "go.mongodb.org/mongo-driver/bson"
+    "go.mongodb.org/mongo-driver/mongo/options"
+)
+
+type User struct {
+    ID    string `bson:"_id,omitempty"`
+    Name  string `bson:"name"`
+    Email string `bson:"email"`
+    Age   int    `bson:"age"`
+}
+
+func main() {
+    ctx := context.Background()
+
+    // Configure with TLS certificate
+    timeoutSec := 30
+    certPath := "/path/to/mongodb-cert.pem"
+    config := &mongodb.Config{
+        ConnectionString: "mongodb://username:password@mongodb.example.com:27017/myapp?ssl=true",
+        TimeoutSec:       &timeoutSec,
+        CertPath:         &certPath,
+    }
+
+    storage, err := mongodb.Open(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer storage.Close(ctx)
+
+    // Get collection
+    collection := storage.Instance.Database("myapp").Collection("users")
+
+    // Create user
+    user := User{
+        Name:  "Jane Smith",
+        Email: "jane@example.com",
+        Age:   25,
+    }
+
+    // Insert with options
+    insertResult, err := collection.InsertOne(ctx, user)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("User created with ID: %v", insertResult.InsertedID)
+
+    // Find users with filter and options
+    filter := bson.M{"age": bson.M{"$gte": 18}}
+    findOptions := options.Find().SetLimit(10).SetSort(bson.M{"name": 1})
+
+    cursor, err := collection.Find(ctx, filter, findOptions)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer cursor.Close(ctx)
+
+    // Iterate through results
+    var users []User
+    for cursor.Next(ctx) {
+        var user User
+        err := cursor.Decode(&user)
+        if err != nil {
+            log.Fatal(err)
+        }
+        users = append(users, user)
+    }
+
+    if err := cursor.Err(); err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Found %d users", len(users))
+    for _, u := range users {
+        log.Printf("User: %s <%s>, Age: %d", u.Name, u.Email, u.Age)
+    }
+
+    // Update user
+    update := bson.M{"$set": bson.M{"age": 26}}
+    updateResult, err := collection.UpdateOne(ctx, bson.M{"email": "jane@example.com"}, update)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Updated %d document(s)", updateResult.ModifiedCount)
+
+    // Delete user
+    deleteResult, err := collection.DeleteOne(ctx, bson.M{"email": "jane@example.com"})
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Deleted %d document(s)", deleteResult.DeletedCount)
+}
+----
+
+== Configuration
+
+[source,go]
+----
+// Basic configuration
+config := &mongodb.Config{
+    ConnectionString: "mongodb://localhost:27017",
+}
+
+// With timeout
+timeoutSec := 30
+config := &mongodb.Config{
+    ConnectionString: "mongodb://username:password@host:27017/database",
+    TimeoutSec:       &timeoutSec,
+}
+
+// With TLS certificate
+certPath := "/path/to/cert.pem"
+config := &mongodb.Config{
+    ConnectionString: "mongodb://host:27017?ssl=true",
+    TimeoutSec:       &timeoutSec,
+    CertPath:         &certPath,
+}
+----
+
+== Connection String Examples
+
+[source,text]
+----
+# Local development
+mongodb://localhost:27017
+
+# With authentication
+mongodb://username:password@host:27017/database
+
+# Replica set
+mongodb://host1:27017,host2:27017,host3:27017/?replicaSet=myReplicaSet
+
+# With SSL
+mongodb://host:27017/?ssl=true
+
+# Atlas connection
+mongodb+srv://username:password@cluster.mongodb.net/database
+----
+
+== Error Handling
+
+[source,go]
+----
+// Handle connection errors
+storage, err := mongodb.Open(config, logger)
+if err != nil {
+    log.Printf("Failed to connect to MongoDB: %v", err)
+    return
+}
+
+// Handle operation errors
+result, err := collection.InsertOne(ctx, document)
+if err != nil {
+    log.Printf("Insert failed: %v", err)
+    return
+}
+
+// Handle timeout errors
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+
+err = collection.FindOne(ctx, filter).Decode(&result)
+if err != nil {
+    if err == context.DeadlineExceeded {
+        log.Println("Operation timed out")
+    } else {
+        log.Printf("Query failed: %v", err)
+    }
+}
+----
+
+== Connection Management
+
+[source,go]
+----
+// Open connection
+storage, err := mongodb.Open(config, logger)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Always close connection when done
+defer storage.Close(context.Background())
+
+// Access MongoDB client
+client := storage.Instance
+database := client.Database("myapp")
+collection := database.Collection("mycollection")
+----
+
+== Dependencies
+
+* `go.mongodb.org/mongo-driver` - Official MongoDB Go driver
+* Kit utilities via `gitlab.com/algmib/kit`
+
+== Thread Safety
+
+The MongoDB client is thread-safe and can be used concurrently from multiple goroutines.

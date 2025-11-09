@@ -1,0 +1,432 @@
+= Elasticsearch Package
+
+A Go client library for Elasticsearch v7, providing simplified methods for document indexing, searching, and index management with built-in error handling and async operations.
+
+== Features
+
+* Document indexing (single and bulk operations)
+* Async indexing for non-blocking operations
+* Document deletion (single and bulk)
+* Index mapping and settings management
+* Built-in error handling with custom error codes
+* Context-aware operations
+* Basic authentication support
+* Configurable tracing and refresh modes
+
+== Installation
+
+[source,go]
+----
+import "gitlab.com/algmib/kit/elasticsearch/v7"
+----
+
+== Configuration
+
+Configure Elasticsearch connection through the `Config` struct:
+
+[source,go]
+----
+type Config struct {
+    Url      string // Elasticsearch URL
+    Trace    bool   // Enable request tracing
+    Sniff    bool   // Enable cluster sniffing
+    Shards   int    // Default shards per index
+    Replicas int    // Default replicas per index
+    Username string // Basic auth username (optional)
+    Password string // Basic auth password (optional)
+    Refresh  bool   // Force refresh after operations (testing only)
+}
+----
+
+== Basic Usage
+
+=== Client Setup
+
+[source,go]
+----
+// Configure Elasticsearch
+config := &v7.Config{
+    Url:      "http://localhost:9200",
+    Trace:    false,
+    Sniff:    false,
+    Shards:   1,
+    Replicas: 0,
+    Username: "elastic",      // Optional
+    Password: "password",     // Optional
+    Refresh:  false,          // Only for testing
+}
+
+// Create client
+client, err := v7.NewEs(config, logger)
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Close(ctx)
+
+// Test connection
+if !client.Ping() {
+    log.Fatal("Elasticsearch not reachable")
+}
+----
+
+== Document Operations
+
+=== Single Document Indexing
+
+[source,go]
+----
+// Index a document
+document := map[string]interface{}{
+    "title":       "Sample Document",
+    "content":     "This is sample content",
+    "created_at":  time.Now(),
+    "author_id":   123,
+}
+
+err := client.Index(ctx, "documents", "doc-1", document)
+if err != nil {
+    log.Printf("Failed to index: %v", err)
+}
+----
+
+=== Async Indexing
+
+[source,go]
+----
+// Index document asynchronously (non-blocking)
+client.IndexAsync(ctx, "documents", "doc-2", document)
+----
+
+=== Bulk Indexing
+
+[source,go]
+----
+// Prepare bulk documents
+documents := map[string]interface{}{
+    "doc-1": map[string]interface{}{
+        "title":   "First Document",
+        "content": "Content of first document",
+    },
+    "doc-2": map[string]interface{}{
+        "title":   "Second Document",
+        "content": "Content of second document",
+    },
+}
+
+// Bulk index
+err := client.IndexBulk(ctx, "documents", documents)
+if err != nil {
+    log.Printf("Bulk indexing failed: %v", err)
+}
+----
+
+=== Async Bulk Indexing
+
+[source,go]
+----
+// Bulk index asynchronously
+client.IndexBulkAsync(ctx, "documents", documents)
+----
+
+== Document Management
+
+=== Check Document Existence
+
+[source,go]
+----
+exists, err := client.Exists(ctx, "documents", "doc-1")
+if err != nil {
+    log.Printf("Error checking existence: %v", err)
+} else if exists {
+    fmt.Println("Document exists")
+}
+----
+
+=== Delete Documents
+
+[source,go]
+----
+// Delete single document
+err := client.Delete(ctx, "documents", "doc-1")
+if err != nil {
+    log.Printf("Failed to delete: %v", err)
+}
+
+// Delete multiple documents
+ids := []string{"doc-1", "doc-2", "doc-3"}
+err = client.DeleteBulk(ctx, "documents", ids)
+if err != nil {
+    log.Printf("Bulk delete failed: %v", err)
+}
+----
+
+== Index Management
+
+=== Create Index with Mapping
+
+[source,go]
+----
+// Create index builder
+builder := client.NewBuilder()
+
+// Define mapping
+properties := v7.EsProperties{
+    "title": &v7.EsProperty{
+        Type: v7.EsTypeText,
+    },
+    "content": &v7.EsProperty{
+        Type: v7.EsTypeText,
+    },
+    "created_at": &v7.EsProperty{
+        Type: v7.EsTypeDate,
+    },
+    "author_id": &v7.EsProperty{
+        Type: v7.EsTypeInteger,
+    },
+    "tags": &v7.EsProperty{
+        Type: v7.EsTypeKeyword,
+    },
+    "status": &v7.EsProperty{
+        Type:  v7.EsTypeKeyword,
+        Index: kit.BoolPtr(false), // Not indexed
+    },
+}
+
+// Create index with mapping
+err := builder.WithProperties(properties).Create(ctx, "documents")
+if err != nil {
+    log.Printf("Failed to create index: %v", err)
+}
+----
+
+== Field Types
+
+The package supports various Elasticsearch field types:
+
+[source,go]
+----
+// Available field types
+v7.EsTypeKeyword         // "keyword" - exact values
+v7.EsTypeText            // "text" - full-text search
+v7.EsTypeDate            // "date" - date/time values
+v7.EsTypeBool            // "boolean" - true/false
+v7.EsTypeLong            // "long" - 64-bit integers
+v7.EsTypeInteger         // "integer" - 32-bit integers
+v7.EsTypeSearchAsYouType // "search_as_you_type" - autocomplete
+v7.EsTypeFlattened       // "flattened" - object as keywords
+v7.EsTypeNested          // "nested" - nested objects
+----
+
+== Advanced Usage
+
+=== Complex Document Structure
+
+[source,go]
+----
+type Article struct {
+    ID        string            `json:"id"`
+    Title     string            `json:"title"`
+    Content   string            `json:"content"`
+    Tags      []string          `json:"tags"`
+    Author    Author            `json:"author"`
+    Metadata  map[string]string `json:"metadata"`
+    CreatedAt time.Time         `json:"created_at"`
+    Published bool              `json:"published"`
+}
+
+type Author struct {
+    ID   int    `json:"id"`
+    Name string `json:"name"`
+}
+
+// Define mapping for complex structure
+properties := v7.EsProperties{
+    "title": &v7.EsProperty{Type: v7.EsTypeText},
+    "content": &v7.EsProperty{Type: v7.EsTypeText},
+    "tags": &v7.EsProperty{Type: v7.EsTypeKeyword},
+    "author": &v7.EsProperty{
+        Type: v7.EsTypeNested,
+        // Nested properties would be defined separately
+    },
+    "metadata": &v7.EsProperty{Type: v7.EsTypeFlattened},
+    "created_at": &v7.EsProperty{Type: v7.EsTypeDate},
+    "published": &v7.EsProperty{Type: v7.EsTypeBool},
+}
+----
+
+=== Direct Client Access
+
+[source,go]
+----
+// Get underlying Elasticsearch client for advanced operations
+elasticClient := client.GetClient()
+
+// Use client for complex searches
+searchResult, err := elasticClient.Search().
+    Index("documents").
+    Query(elastic.NewMatchQuery("content", "search term")).
+    Sort("created_at", false).
+    From(0).Size(10).
+    Do(ctx)
+----
+
+=== Manual Refresh
+
+[source,go]
+----
+// Force refresh for testing (don't use in production)
+err := client.Refresh(ctx, "documents")
+if err != nil {
+    log.Printf("Refresh failed: %v", err)
+}
+----
+
+== Complete Example
+
+[source,go]
+----
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+
+    "gitlab.com/algmib/kit"
+    v7 "gitlab.com/algmib/kit/elasticsearch/v7"
+)
+
+type Document struct {
+    Title     string    `json:"title"`
+    Content   string    `json:"content"`
+    AuthorID  int       `json:"author_id"`
+    Tags      []string  `json:"tags"`
+    CreatedAt time.Time `json:"created_at"`
+}
+
+func main() {
+    ctx := context.Background()
+    logger := func() kit.CLogger {
+        return kit.L(kit.InitLogger(&kit.LogConfig{Level: kit.InfoLevel}))
+    }
+
+    // Configure Elasticsearch
+    config := &v7.Config{
+        Url:      "http://localhost:9200",
+        Shards:   1,
+        Replicas: 0,
+        Refresh:  true, // Only for demo
+    }
+
+    // Create client
+    client, err := v7.NewEs(config, logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close(ctx)
+
+    // Create index with mapping
+    properties := v7.EsProperties{
+        "title":      &v7.EsProperty{Type: v7.EsTypeText},
+        "content":    &v7.EsProperty{Type: v7.EsTypeText},
+        "author_id":  &v7.EsProperty{Type: v7.EsTypeInteger},
+        "tags":       &v7.EsProperty{Type: v7.EsTypeKeyword},
+        "created_at": &v7.EsProperty{Type: v7.EsTypeDate},
+    }
+
+    builder := client.NewBuilder()
+    err = builder.WithProperties(properties).Create(ctx, "articles")
+    if err != nil {
+        log.Printf("Index creation: %v", err)
+    }
+
+    // Index some documents
+    documents := map[string]interface{}{
+        "article-1": Document{
+            Title:     "Getting Started with Elasticsearch",
+            Content:   "This article covers the basics of Elasticsearch...",
+            AuthorID:  1,
+            Tags:      []string{"elasticsearch", "search", "tutorial"},
+            CreatedAt: time.Now(),
+        },
+        "article-2": Document{
+            Title:     "Advanced Search Techniques",
+            Content:   "Learn about complex queries and aggregations...",
+            AuthorID:  2,
+            Tags:      []string{"elasticsearch", "advanced", "queries"},
+            CreatedAt: time.Now().Add(-time.Hour),
+        },
+    }
+
+    // Bulk index
+    err = client.IndexBulk(ctx, "articles", documents)
+    if err != nil {
+        log.Printf("Bulk indexing failed: %v", err)
+    } else {
+        log.Println("Documents indexed successfully")
+    }
+
+    // Check if document exists
+    exists, err := client.Exists(ctx, "articles", "article-1")
+    if err != nil {
+        log.Printf("Error checking existence: %v", err)
+    } else {
+        log.Printf("Article-1 exists: %v", exists)
+    }
+}
+----
+
+== Configuration Best Practices
+
+=== Production Settings
+
+[source,go]
+----
+config := &v7.Config{
+    Url:      "https://es-cluster.example.com:9200",
+    Trace:    false,           // Disable in production
+    Sniff:    false,          // Usually disabled in containerized environments
+    Shards:   3,              // Based on data size and nodes
+    Replicas: 1,              // At least 1 for high availability
+    Username: "app_user",     // Use dedicated user
+    Password: "secure_pass",  // From environment/secrets
+    Refresh:  false,          // Never true in production
+}
+----
+
+=== Development/Testing Settings
+
+[source,go]
+----
+config := &v7.Config{
+    Url:      "http://localhost:9200",
+    Trace:    true,    // Enable for debugging
+    Sniff:    true,    // OK for local development
+    Shards:   1,       // Single shard for testing
+    Replicas: 0,       // No replicas needed
+    Refresh:  true,    // Immediate visibility for tests
+}
+----
+
+== Error Handling
+
+The package provides custom error codes for different operations. All errors include context information for debugging.
+
+== Best Practices
+
+1. **Index Design**: Plan your mapping before indexing data
+2. **Bulk Operations**: Use bulk operations for better performance
+3. **Async Operations**: Use async methods for non-critical indexing
+4. **Connection Pooling**: Reuse client instances across your application
+5. **Error Handling**: Always handle and log errors appropriately
+6. **Refresh Settings**: Never use `Refresh: true` in production
+7. **Security**: Use authentication and HTTPS in production environments
+
+== Dependencies
+
+* Olivere Elasticsearch Go client v7
+* ChatLab Kit utilities for logging and error handling
+
+== Thread Safety
+
+The Elasticsearch client is thread-safe and can be used concurrently from multiple goroutines.
