@@ -2,9 +2,9 @@ package v7
 
 import (
 	"context"
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/goroutine"
 	"github.com/olivere/elastic/v7"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/goroutine"
 )
 
 // Config - model of ES configuration

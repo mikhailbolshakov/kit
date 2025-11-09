@@ -15,7 +15,7 @@ A Go library providing enhanced goroutine management with panic recovery, retry 
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/goroutine"
+import "github.com/mikhailbolshakov/kit/goroutine"
 ----
 
 == Basic Goroutine Wrapper

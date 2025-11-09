@@ -7,8 +7,8 @@ package mocks
 import (
 	"context"
 
+	"github.com/mikhailbolshakov/kit"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit"
 )
 
 // NewKitAppErrBuilder creates a new instance of KitAppErrBuilder. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

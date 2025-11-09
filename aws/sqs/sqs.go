@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"gitlab.com/algmib/kit"
-	kitAws "gitlab.com/algmib/kit/aws"
+	"github.com/mikhailbolshakov/kit"
+	kitAws "github.com/mikhailbolshakov/kit/aws"
 )
 
 const (

@@ -8,9 +8,9 @@ import (
 	"context"
 
 	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/mikhailbolshakov/kit"
+	aerospike0 "github.com/mikhailbolshakov/kit/storages/aerospike"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit"
-	aerospike0 "gitlab.com/algmib/kit/storages/aerospike"
 )
 
 // NewAerospikeAerospike creates a new instance of AerospikeAerospike. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

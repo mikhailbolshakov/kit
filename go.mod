@@ -1,4 +1,4 @@
-module gitlab.com/algmib/kit
+module github.com/mikhailbolshakov/kit
 
 go 1.24.2
 

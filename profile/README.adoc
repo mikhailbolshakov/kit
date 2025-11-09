@@ -15,7 +15,7 @@ A Go library for exposing application profiling endpoints via HTTP server, provi
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/profile"
+import "github.com/mikhailbolshakov/kit/profile"
 ----
 
 == Basic Usage
@@ -30,7 +30,7 @@ import (
     "log"
     "time"
 
-    "gitlab.com/algmib/kit/profile"
+    "github.com/mikhailbolshakov/kit/profile"
 )
 
 func main() {
@@ -70,7 +70,7 @@ import (
     "log"
     "os"
 
-    "gitlab.com/algmib/kit/profile"
+    "github.com/mikhailbolshakov/kit/profile"
 )
 
 func main() {
@@ -144,7 +144,7 @@ server.Listen()
 == Dependencies
 
 * Go's built-in `net/http/pprof` package
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

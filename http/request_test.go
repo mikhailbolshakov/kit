@@ -3,8 +3,8 @@ package http
 import (
 	"context"
 	"errors"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
 	"io"
 	"net/http"
 	nUrl "net/url"

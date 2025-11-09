@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/goroutine"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/goroutine"
 	"net/http"
 	"regexp"
 )

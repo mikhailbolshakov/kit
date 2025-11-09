@@ -2,7 +2,7 @@ package ftp
 
 import (
 	"context"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 const (

@@ -1,8 +1,8 @@
 package cluster
 
 import (
+	"github.com/mikhailbolshakov/kit"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
 	"testing"
 )
 

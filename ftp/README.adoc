@@ -16,7 +16,7 @@ A Go library for FTP operations, providing simple methods to read and upload fil
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/ftp"
+import "github.com/mikhailbolshakov/kit/ftp"
 ----
 
 == Basic Usage
@@ -32,7 +32,7 @@ import (
     "fmt"
     "log"
 
-    "gitlab.com/algmib/kit/ftp"
+    "github.com/mikhailbolshakov/kit/ftp"
 )
 
 func main() {
@@ -61,7 +61,7 @@ import (
     "context"
     "log"
 
-    "gitlab.com/algmib/kit/ftp"
+    "github.com/mikhailbolshakov/kit/ftp"
 )
 
 func main() {

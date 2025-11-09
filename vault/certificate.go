@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 func ToCSRPemString(ctx context.Context, csr *x509.CertificateRequest) (string, error) {

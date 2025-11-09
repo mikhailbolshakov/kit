@@ -2,7 +2,7 @@ package v8
 
 import (
 	"context"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 var (

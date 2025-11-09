@@ -15,7 +15,7 @@ A Go library for integrating with Google services including OAuth2 authenticatio
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/google"
+import "github.com/mikhailbolshakov/kit/google"
 ----
 
 == Configuration
@@ -167,8 +167,8 @@ import (
     "net/http"
     "log"
 
-    "gitlab.com/algmib/kit"
-    "gitlab.com/algmib/kit/google"
+    "github.com/mikhailbolshakov/kit"
+    "github.com/mikhailbolshakov/kit/google"
 )
 
 type AuthRequest struct {
@@ -322,8 +322,8 @@ import (
     "net/http"
     "log"
 
-    "gitlab.com/algmib/kit"
-    "gitlab.com/algmib/kit/google"
+    "github.com/mikhailbolshakov/kit"
+    "github.com/mikhailbolshakov/kit/google"
 )
 
 type ContactForm struct {

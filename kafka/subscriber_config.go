@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 // SubscriberConfig specifies subscriber config params

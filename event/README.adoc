@@ -16,7 +16,7 @@ A Go library providing both type-safe generic event handlers and a flexible even
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/event"
+import "github.com/mikhailbolshakov/kit/event"
 ----
 
 == Generic Event Handler
@@ -202,8 +202,8 @@ import (
     "fmt"
     "time"
 
-    "gitlab.com/algmib/kit"
-    "gitlab.com/algmib/kit/event"
+    "github.com/mikhailbolshakov/kit"
+    "github.com/mikhailbolshakov/kit/event"
 )
 
 type Order struct {

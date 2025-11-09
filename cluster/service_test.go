@@ -2,10 +2,10 @@ package cluster
 
 import (
 	_ "embed"
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/storages/clickhouse"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/storages/clickhouse"
 	"os"
 	"reflect"
 	"testing"

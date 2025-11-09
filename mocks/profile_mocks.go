@@ -5,8 +5,8 @@
 package mocks
 
 import (
+	"github.com/mikhailbolshakov/kit/profile"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/profile"
 )
 
 // NewProfileServer creates a new instance of ProfileServer. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

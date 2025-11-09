@@ -17,7 +17,7 @@ A Go library for managing translations and localization, providing simple method
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/localization"
+import "github.com/mikhailbolshakov/kit/localization"
 ----
 
 == Basic Usage
@@ -33,7 +33,7 @@ import (
     "fmt"
     "log"
 
-    "gitlab.com/algmib/kit/localization"
+    "github.com/mikhailbolshakov/kit/localization"
 )
 
 func main() {
@@ -83,7 +83,7 @@ import (
     "fmt"
     "log"
 
-    "gitlab.com/algmib/kit/localization"
+    "github.com/mikhailbolshakov/kit/localization"
 )
 
 // User implements Translatable interface
@@ -153,9 +153,9 @@ if err != nil {
 
 == Dependencies
 
-* PostgreSQL storage via `gitlab.com/algmib/kit/storages/pg`
-* Redis caching via `gitlab.com/algmib/kit/storages/redis`
-* Kit utilities via `gitlab.com/algmib/kit`
+* PostgreSQL storage via `github.com/mikhailbolshakov/kit/storages/pg`
+* Redis caching via `github.com/mikhailbolshakov/kit/storages/redis`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

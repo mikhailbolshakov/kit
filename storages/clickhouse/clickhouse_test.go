@@ -4,8 +4,8 @@ package clickhouse
 
 import (
 	"fmt"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
 	"testing"
 )
 
@@ -27,7 +27,7 @@ var (
 	config = &Config{
 		User:     "admin",
 		Password: "admin",
-		Database: "algmib",
+		Database: "test",
 		Port:     "19000",
 		Host:     "127.0.0.1",
 	}

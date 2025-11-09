@@ -4,7 +4,7 @@ import (
 	"context"
 	aero "github.com/aerospike/aerospike-client-go/v7"
 	aeroLogger "github.com/aerospike/aerospike-client-go/v7/logger"
-	kitLog "gitlab.com/algmib/kit"
+	kitLog "github.com/mikhailbolshakov/kit"
 )
 
 type Config struct {

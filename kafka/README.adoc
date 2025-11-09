@@ -17,7 +17,7 @@ A Go library for Apache Kafka integration providing producers, subscribers, and 
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/kafka"
+import "github.com/mikhailbolshakov/kit/kafka"
 ----
 
 == Configuration

@@ -16,7 +16,7 @@ A Go library for ClickHouse database connectivity, providing simple connection m
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/clickhouse"
+import "github.com/mikhailbolshakov/kit/clickhouse"
 ----
 
 == Basic Usage
@@ -31,7 +31,7 @@ import (
     "context"
     "log"
 
-    "gitlab.com/algmib/kit/clickhouse"
+    "github.com/mikhailbolshakov/kit/clickhouse"
 )
 
 func main() {
@@ -83,7 +83,7 @@ import (
     "database/sql"
     "log"
 
-    "gitlab.com/algmib/kit/clickhouse"
+    "github.com/mikhailbolshakov/kit/clickhouse"
 )
 
 func main() {
@@ -238,7 +238,7 @@ defer db.Close() // Standard SQL cleanup
 == Dependencies
 
 * `github.com/ClickHouse/clickhouse-go/v2` - ClickHouse Go driver
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

@@ -6,9 +6,9 @@ import (
 	"io"
 	"time"
 
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/goroutine"
 	"github.com/segmentio/kafka-go"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/goroutine"
 )
 
 const (

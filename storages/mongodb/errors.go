@@ -1,6 +1,6 @@
 package mongodb
 
-import "gitlab.com/algmib/kit"
+import "github.com/mikhailbolshakov/kit"
 
 const (
 	ErrCodeReadCertFile = "MNG-001"

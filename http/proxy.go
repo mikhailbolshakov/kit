@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/textproto"
 
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 // ProxyConfig is proxy http configuration

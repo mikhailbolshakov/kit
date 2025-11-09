@@ -17,7 +17,7 @@ A Go library for building gRPC clients and servers with built-in authentication,
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/grpc"
+import "github.com/mikhailbolshakov/kit/grpc"
 ----
 
 == Configuration

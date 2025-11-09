@@ -7,8 +7,8 @@ package mocks
 import (
 	"context"
 
+	"github.com/mikhailbolshakov/kit/vault"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/vault"
 )
 
 // NewVaultVault creates a new instance of VaultVault. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

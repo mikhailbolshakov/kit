@@ -4,8 +4,8 @@ package redis
 
 import (
 	"fmt"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
 	"testing"
 	"time"
 )

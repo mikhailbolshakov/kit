@@ -17,7 +17,7 @@ A Go client library for Elasticsearch v7, providing simplified methods for docum
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/elasticsearch/v7"
+import "github.com/mikhailbolshakov/kit/elasticsearch/v7"
 ----
 
 == Configuration
@@ -292,8 +292,8 @@ import (
     "log"
     "time"
 
-    "gitlab.com/algmib/kit"
-    v7 "gitlab.com/algmib/kit/elasticsearch/v7"
+    "github.com/mikhailbolshakov/kit"
+    v7 "github.com/mikhailbolshakov/kit/elasticsearch/v7"
 )
 
 type Document struct {

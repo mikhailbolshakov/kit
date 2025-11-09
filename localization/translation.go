@@ -2,9 +2,9 @@ package localization
 
 import (
 	"context"
-	"gitlab.com/algmib/kit"
-	kitPg "gitlab.com/algmib/kit/storages/pg"
-	kitRedis "gitlab.com/algmib/kit/storages/redis"
+	"github.com/mikhailbolshakov/kit"
+	kitPg "github.com/mikhailbolshakov/kit/storages/pg"
+	kitRedis "github.com/mikhailbolshakov/kit/storages/redis"
 )
 
 // Config defines language configuration settings

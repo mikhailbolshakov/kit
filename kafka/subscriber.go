@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/mikhailbolshakov/kit"
 	"github.com/segmentio/kafka-go"
-	"gitlab.com/algmib/kit"
 )
 
 const (

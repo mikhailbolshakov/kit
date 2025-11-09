@@ -5,7 +5,7 @@ package minio
 import (
 	"bytes"
 	"context"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"io/ioutil"
 	"testing"
 )

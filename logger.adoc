@@ -19,7 +19,7 @@ A Go library providing structured logging with context-aware capabilities, built
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit"
+import "github.com/mikhailbolshakov/kit"
 ----
 
 == Basic Usage
@@ -34,7 +34,7 @@ import (
     "context"
     "errors"
 
-    "gitlab.com/algmib/kit"
+    "github.com/mikhailbolshakov/kit"
 )
 
 func main() {
@@ -86,7 +86,7 @@ import (
     "fmt"
     "net/http"
 
-    "gitlab.com/algmib/kit"
+    "github.com/mikhailbolshakov/kit"
 )
 
 // UserService demonstrates service logging patterns
@@ -446,7 +446,7 @@ httpServer := &http.Server{
 == Dependencies
 
 * `github.com/rs/zerolog` - High-performance structured logging
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

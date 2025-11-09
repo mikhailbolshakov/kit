@@ -17,7 +17,7 @@ A Go library for building HTTP servers and making HTTP client requests with buil
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/http"
+import "github.com/mikhailbolshakov/kit/http"
 ----
 
 == HTTP Server

@@ -17,7 +17,7 @@ A Go library for PostgreSQL database connectivity using GORM, providing simple c
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/pg"
+import "github.com/mikhailbolshakov/kit/pg"
 ----
 
 == Basic Usage
@@ -31,7 +31,7 @@ package main
 import (
     "log"
 
-    "gitlab.com/algmib/kit/pg"
+    "github.com/mikhailbolshakov/kit/pg"
 )
 
 func main() {
@@ -91,8 +91,8 @@ package main
 import (
     "log"
 
-    "gitlab.com/algmib/kit"
-    "gitlab.com/algmib/kit/pg"
+    "github.com/mikhailbolshakov/kit"
+    "github.com/mikhailbolshakov/kit/pg"
     "github.com/jackc/pgtype"
 )
 
@@ -332,7 +332,7 @@ if err != nil {
 * `gorm.io/driver/postgres` - PostgreSQL driver for GORM
 * `github.com/jackc/pgtype` - PostgreSQL data types
 * `github.com/lib/pq` - PostgreSQL driver utilities
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

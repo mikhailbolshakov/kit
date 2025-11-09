@@ -2,7 +2,7 @@ package v8
 
 import (
 	"bytes"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"io"
 	"strings"
 )

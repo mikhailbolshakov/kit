@@ -16,7 +16,7 @@ A Go library for MongoDB database connectivity, providing simple connection mana
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/mongodb"
+import "github.com/mikhailbolshakov/kit/mongodb"
 ----
 
 == Basic Usage
@@ -31,7 +31,7 @@ import (
     "context"
     "log"
 
-    "gitlab.com/algmib/kit/mongodb"
+    "github.com/mikhailbolshakov/kit/mongodb"
     "go.mongodb.org/mongo-driver/bson"
 )
 
@@ -91,7 +91,7 @@ import (
     "context"
     "log"
 
-    "gitlab.com/algmib/kit/mongodb"
+    "github.com/mikhailbolshakov/kit/mongodb"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -287,7 +287,7 @@ collection := database.Collection("mycollection")
 == Dependencies
 
 * `go.mongodb.org/mongo-driver` - Official MongoDB Go driver
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

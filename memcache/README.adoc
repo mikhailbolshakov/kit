@@ -15,7 +15,7 @@ A Go library providing simple in-memory caching with TTL (Time To Live) support,
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/memcache"
+import "github.com/mikhailbolshakov/kit/memcache"
 ----
 
 == Basic Usage
@@ -30,7 +30,7 @@ import (
     "fmt"
     "time"
 
-    "gitlab.com/algmib/kit/memcache"
+    "github.com/mikhailbolshakov/kit/memcache"
 )
 
 func main() {
@@ -67,7 +67,7 @@ import (
     "fmt"
     "time"
 
-    "gitlab.com/algmib/kit/memcache"
+    "github.com/mikhailbolshakov/kit/memcache"
 )
 
 type UserData struct {

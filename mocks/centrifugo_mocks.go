@@ -8,8 +8,8 @@ import (
 	"context"
 
 	"github.com/centrifugal/centrifuge-go"
+	"github.com/mikhailbolshakov/kit/centrifugo/proto"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/centrifugo/proto"
 )
 
 // NewCentrifugoClient creates a new instance of CentrifugoClient. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

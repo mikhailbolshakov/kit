@@ -17,7 +17,7 @@ A Go library providing functional programming utilities with generics support, i
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit"
+import "github.com/mikhailbolshakov/kit"
 ----
 
 == Basic Usage
@@ -33,7 +33,7 @@ import (
     "strconv"
     "strings"
 
-    "gitlab.com/algmib/kit"
+    "github.com/mikhailbolshakov/kit"
 )
 
 type User struct {
@@ -106,7 +106,7 @@ import (
     "sort"
     "strings"
 
-    "gitlab.com/algmib/kit"
+    "github.com/mikhailbolshakov/kit"
 )
 
 type Order struct {

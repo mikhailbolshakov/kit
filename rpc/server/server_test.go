@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/kafka"
+	"github.com/mikhailbolshakov/kit/mocks"
+	"github.com/mikhailbolshakov/kit/rpc"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/kafka"
-	"gitlab.com/algmib/kit/mocks"
-	"gitlab.com/algmib/kit/rpc"
 )
 
 type rpcServerTestSuite struct {

@@ -7,8 +7,8 @@ package mocks
 import (
 	"context"
 
+	"github.com/mikhailbolshakov/kit/google"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/google"
 	"google.golang.org/api/oauth2/v2"
 )
 

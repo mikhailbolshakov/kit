@@ -3,8 +3,8 @@ package impl
 import (
 	"context"
 	"fmt"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/localization"
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/localization"
 	"math/rand"
 )
 

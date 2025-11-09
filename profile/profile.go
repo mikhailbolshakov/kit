@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/goroutine"
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/goroutine"
 	"net/http"
 	_ "net/http/pprof"
 )

@@ -3,7 +3,7 @@ package v8
 import (
 	"context"
 	"fmt"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"reflect"
 	"strconv"
 	"strings"

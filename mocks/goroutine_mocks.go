@@ -8,9 +8,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/goroutine"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/goroutine"
 )
 
 // NewGoroutineErrGroup creates a new instance of GoroutineErrGroup. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

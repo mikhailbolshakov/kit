@@ -18,7 +18,7 @@ A Go library providing structured application error handling with support for er
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit"
+import "github.com/mikhailbolshakov/kit"
 ----
 
 == Basic Usage
@@ -34,7 +34,7 @@ import (
     "log"
     "net/http"
 
-    "gitlab.com/algmib/kit"
+    "github.com/mikhailbolshakov/kit"
 )
 
 func main() {
@@ -87,7 +87,7 @@ import (
     "log"
     "net/http"
 
-    "gitlab.com/algmib/kit"
+    "github.com/mikhailbolshakov/kit"
 )
 
 type UserService struct {
@@ -326,7 +326,7 @@ if appErr, ok := kit.IsAppErr(err); ok {
 == Dependencies
 
 * `github.com/pkg/errors` - Error wrapping and stack traces
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

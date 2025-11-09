@@ -3,10 +3,10 @@ package minio
 import (
 	"context"
 	"fmt"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/mitchellh/mapstructure"
-	"gitlab.com/algmib/kit"
 	"io"
 )
 

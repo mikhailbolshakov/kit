@@ -3,7 +3,7 @@ package v8
 import (
 	"context"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"io"
 	"net/http"
 )

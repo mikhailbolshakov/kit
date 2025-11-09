@@ -5,8 +5,8 @@ package aerospike
 import (
 	"context"
 	aero "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/algmib/kit"
 	"testing"
 )
 

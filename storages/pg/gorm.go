@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgtype"
 	"github.com/lib/pq"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

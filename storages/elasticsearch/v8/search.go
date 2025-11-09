@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 type searchImpl struct {

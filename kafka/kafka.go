@@ -2,12 +2,12 @@ package kafka
 
 import (
 	"context"
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/goroutine"
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl"
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"github.com/segmentio/kafka-go/sasl/scram"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/goroutine"
 	"strings"
 	"sync"
 )

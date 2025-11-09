@@ -19,7 +19,7 @@ A Go library for HashiCorp Vault PKI operations, providing simple certificate ma
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/vault"
+import "github.com/mikhailbolshakov/kit/vault"
 ----
 
 == Basic Usage
@@ -34,7 +34,7 @@ import (
     "context"
     "log"
 
-    "gitlab.com/algmib/kit/vault"
+    "github.com/mikhailbolshakov/kit/vault"
 )
 
 func main() {
@@ -126,7 +126,7 @@ import (
     "encoding/pem"
     "log"
 
-    "gitlab.com/algmib/kit/vault"
+    "github.com/mikhailbolshakov/kit/vault"
 )
 
 func main() {
@@ -349,7 +349,7 @@ err = client.UnmountPKIEngine(ctx)
 == Dependencies
 
 * `github.com/hashicorp/vault/api` - Vault Go client
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

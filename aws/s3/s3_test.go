@@ -7,9 +7,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/mikhailbolshakov/kit"
+	kitAws "github.com/mikhailbolshakov/kit/aws"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
-	kitAws "gitlab.com/algmib/kit/aws"
 )
 
 type s3TestSuite struct {
@@ -28,15 +28,15 @@ func TestS3Suite(t *testing.T) {
 
 var (
 	s3Cfg = &Config{
-		PublicBucketName:  "ext.storage.dev.algmib",
-		PrivateBucketName: "int.storage.dev.algmib",
+		PublicBucketName:  "ext.storage.dev.test",
+		PrivateBucketName: "int.storage.dev.test",
 		PresignedLinkTTL:  60,
 	}
 	awsCfg = &kitAws.Config{
 		Region:              "eu-central-1",
 		AccessKeyId:         "access_key_id",
 		SecretAccessKey:     "secret_access_key",
-		SharedConfigProfile: "algmib/dev",
+		SharedConfigProfile: "test/dev",
 	}
 )
 

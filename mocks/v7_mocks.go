@@ -7,9 +7,9 @@ package mocks
 import (
 	"context"
 
+	"github.com/mikhailbolshakov/kit/storages/elasticsearch/v7"
 	"github.com/olivere/elastic/v7"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/storages/elasticsearch/v7"
 )
 
 // NewV7Search creates a new instance of V7Search. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

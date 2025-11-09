@@ -15,7 +15,7 @@ A Go library for reading Excel files, providing simple methods to extract data f
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/excel"
+import "github.com/mikhailbolshakov/kit/excel"
 ----
 
 == Basic Usage
@@ -116,7 +116,7 @@ import (
     "os"
     "strconv"
 
-    "gitlab.com/algmib/kit/excel"
+    "github.com/mikhailbolshakov/kit/excel"
 )
 
 type Employee struct {
@@ -302,7 +302,7 @@ import (
     "net/http"
     "log"
 
-    "gitlab.com/algmib/kit/excel"
+    "github.com/mikhailbolshakov/kit/excel"
 )
 
 func handleExcelUpload(w http.ResponseWriter, r *http.Request) {

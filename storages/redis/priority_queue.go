@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/go-redis/redis/v8"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 type PriorityQueue[T any] interface {

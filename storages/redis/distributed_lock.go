@@ -2,7 +2,7 @@ package redis
 
 import (
 	"context"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"time"
 )
 

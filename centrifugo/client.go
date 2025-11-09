@@ -3,7 +3,7 @@ package centrifugo
 import (
 	"context"
 	"github.com/centrifugal/centrifuge-go"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"go.uber.org/atomic"
 )
 

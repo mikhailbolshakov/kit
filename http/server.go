@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/goroutine"
 	"github.com/rs/cors"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/goroutine"
 	"net/http"
 	"time"
 )

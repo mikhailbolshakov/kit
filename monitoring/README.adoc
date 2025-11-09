@@ -16,7 +16,7 @@ A Go library for exposing application metrics via Prometheus, providing simple H
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/monitoring"
+import "github.com/mikhailbolshakov/kit/monitoring"
 ----
 
 == Basic Usage
@@ -30,7 +30,7 @@ package main
 import (
     "log"
 
-    "gitlab.com/algmib/kit/monitoring"
+    "github.com/mikhailbolshakov/kit/monitoring"
 )
 
 func main() {
@@ -71,7 +71,7 @@ import (
     "log"
 
     "github.com/prometheus/client_golang/prometheus"
-    "gitlab.com/algmib/kit/monitoring"
+    "github.com/mikhailbolshakov/kit/monitoring"
 )
 
 type AppMetrics struct {
@@ -170,7 +170,7 @@ http://localhost:9090/metrics
 
 * `github.com/prometheus/client_golang/prometheus` - Prometheus client library
 * `github.com/gorilla/mux` - HTTP router
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

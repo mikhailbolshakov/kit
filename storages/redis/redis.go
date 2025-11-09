@@ -3,7 +3,7 @@ package redis
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"net"
 	"time"
 )

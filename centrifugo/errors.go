@@ -3,8 +3,8 @@ package centrifugo
 import (
 	"context"
 
-	"gitlab.com/algmib/kit"
-	apiproto "gitlab.com/algmib/kit/centrifugo/proto"
+	"github.com/mikhailbolshakov/kit"
+	apiproto "github.com/mikhailbolshakov/kit/centrifugo/proto"
 )
 
 const (

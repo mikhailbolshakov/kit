@@ -1,7 +1,7 @@
 package clickhouse
 
 import (
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 const (

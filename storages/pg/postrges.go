@@ -2,7 +2,7 @@ package pg
 
 import (
 	"fmt"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"

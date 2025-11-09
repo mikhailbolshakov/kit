@@ -2,7 +2,7 @@ package aerospike
 
 import (
 	"context"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 var (

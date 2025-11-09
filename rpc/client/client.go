@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/kafka"
+	"github.com/mikhailbolshakov/kit/rpc"
 	"github.com/mitchellh/mapstructure"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/kafka"
-	"gitlab.com/algmib/kit/rpc"
 )
 
 type msgTypeBodyProviders map[rpc.MessageType]func() interface{}

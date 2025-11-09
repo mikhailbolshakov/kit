@@ -3,7 +3,7 @@ package v7
 import (
 	"context"
 
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 var (

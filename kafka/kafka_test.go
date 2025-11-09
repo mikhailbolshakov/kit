@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikhailbolshakov/kit"
 	"github.com/segmentio/kafka-go"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
 	"go.uber.org/atomic"
 )
 

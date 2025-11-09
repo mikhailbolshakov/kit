@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/mikhailbolshakov/kit"
+	kitAws "github.com/mikhailbolshakov/kit/aws"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
-	kitAws "gitlab.com/algmib/kit/aws"
 )
 
 type s3TestSuite struct {
@@ -30,7 +30,7 @@ var (
 		Region:              "eu-central-1",
 		AccessKeyId:         "access_key_id",
 		SecretAccessKey:     "secret_access_key",
-		SharedConfigProfile: "algmib/dev",
+		SharedConfigProfile: "test/dev",
 	}
 )
 

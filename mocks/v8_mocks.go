@@ -9,8 +9,8 @@ import (
 	"io"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/mikhailbolshakov/kit/storages/elasticsearch/v8"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/storages/elasticsearch/v8"
 )
 
 // NewV8DataBody creates a new instance of V8DataBody. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

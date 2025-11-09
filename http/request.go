@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 const (

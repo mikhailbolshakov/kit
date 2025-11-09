@@ -2,7 +2,7 @@ package http
 
 import (
 	"context"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"net/http"
 )
 

@@ -4,16 +4,16 @@ package impl
 
 import (
 	"fmt"
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/localization"
+	kitPg "github.com/mikhailbolshakov/kit/storages/pg"
+	kitRedis "github.com/mikhailbolshakov/kit/storages/redis"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/localization"
-	kitPg "gitlab.com/algmib/kit/storages/pg"
-	kitRedis "gitlab.com/algmib/kit/storages/redis"
 	"testing"
 )
 
 var (
-	connectionString = "postgres://product:product@localhost:55432/algmib?connect_timeout=10&sslmode=disable"
+	connectionString = "postgres://product:product@localhost:55432/test?connect_timeout=10&sslmode=disable"
 
 	redisConfig = &kitRedis.Config{
 		Host: "localhost",

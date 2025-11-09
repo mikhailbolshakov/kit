@@ -2,8 +2,8 @@ package v7
 
 import (
 	"context"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/olivere/elastic/v7"
-	"gitlab.com/algmib/kit"
 )
 
 func ToSortRequestEs(ctx context.Context, request *kit.SortRequest) (*elastic.SortInfo, error) {

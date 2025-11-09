@@ -10,8 +10,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	http0 "github.com/mikhailbolshakov/kit/http"
 	mock "github.com/stretchr/testify/mock"
-	http0 "gitlab.com/algmib/kit/http"
 )
 
 // NewHttpController creates a new instance of HttpController. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

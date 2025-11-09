@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"google.golang.org/grpc/metadata"
 )
 

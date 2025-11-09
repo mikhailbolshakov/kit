@@ -17,7 +17,7 @@ A Go library for asynchronous RPC communication over message brokers, providing 
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/rpc"
+import "github.com/mikhailbolshakov/kit/rpc"
 ----
 
 == Basic Usage
@@ -34,7 +34,7 @@ import (
     "log"
     "time"
 
-    "gitlab.com/algmib/kit/rpc"
+    "github.com/mikhailbolshakov/kit/rpc"
 )
 
 func main() {
@@ -85,7 +85,7 @@ import (
     "fmt"
     "log"
 
-    "gitlab.com/algmib/kit/rpc"
+    "github.com/mikhailbolshakov/kit/rpc"
 )
 
 type UserRequest struct {
@@ -193,7 +193,7 @@ distributedKeys.Remove("user:123")
 == Dependencies
 
 * Message broker integration (Kafka, etc.)
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

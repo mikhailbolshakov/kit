@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/pressly/goose/v3"
-	"gitlab.com/algmib/kit"
 	"os"
 	"path/filepath"
 )

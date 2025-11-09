@@ -15,7 +15,7 @@ A Go client library for interacting with Amazon S3, providing simplified methods
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/aws/s3"
+import "github.com/mikhailbolshakov/kit/aws/s3"
 ----
 
 == Configuration

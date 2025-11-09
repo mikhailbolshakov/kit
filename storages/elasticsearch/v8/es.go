@@ -3,7 +3,7 @@ package v8
 import (
 	"context"
 	elastic "github.com/elastic/go-elasticsearch/v8"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 // Config - model of ES configuration

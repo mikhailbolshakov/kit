@@ -15,7 +15,7 @@ A Go client library for interacting with Amazon Simple Queue Service (SQS), prov
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/aws/sqs"
+import "github.com/mikhailbolshakov/kit/aws/sqs"
 ----
 
 == Configuration
@@ -145,9 +145,9 @@ import (
     "time"
 
     "github.com/aws/aws-sdk-go-v2/service/sqs/types"
-    "gitlab.com/algmib/kit"
-    kitAws "gitlab.com/algmib/kit/aws"
-    "gitlab.com/algmib/kit/aws/sqs"
+    "github.com/mikhailbolshakov/kit"
+    kitAws "github.com/mikhailbolshakov/kit/aws"
+    "github.com/mikhailbolshakov/kit/aws/sqs"
 )
 
 func main() {

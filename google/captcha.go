@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 const (

@@ -3,7 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"io"
 	"net/http"
 )

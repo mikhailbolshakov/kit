@@ -80,7 +80,7 @@ make vendor
 
 [source,go]
 ----
-go get gitlab.com/algmib/kit
+go get github.com/mikhailbolshakov/kit
 ----
 
 == Basic Usage
@@ -93,9 +93,9 @@ import (
     "context"
     "log"
 
-    "gitlab.com/algmib/kit"
-    "gitlab.com/algmib/kit/redis"
-    "gitlab.com/algmib/kit/pg"
+    "github.com/mikhailbolshakov/kit"
+    "github.com/mikhailbolshakov/kit/redis"
+    "github.com/mikhailbolshakov/kit/pg"
 )
 
 func main() {

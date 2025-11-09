@@ -8,8 +8,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"gitlab.com/algmib/kit"
-	apiproto "gitlab.com/algmib/kit/centrifugo/proto"
+	"github.com/mikhailbolshakov/kit"
+	apiproto "github.com/mikhailbolshakov/kit/centrifugo/proto"
 )
 
 type Server interface {

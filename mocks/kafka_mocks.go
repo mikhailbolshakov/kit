@@ -8,8 +8,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/mikhailbolshakov/kit/kafka"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/kafka"
 )
 
 // NewKafkaBroker creates a new instance of KafkaBroker. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

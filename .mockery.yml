@@ -10,7 +10,7 @@ template: testify
 template-schema: '{{.Template}}.schema.json'
 pkgname: mocks
 packages:
-  gitlab.com/algmib/kit:
+  github.com/mikhailbolshakov/kit:
     config:
       all: true
       pkgname: mocks

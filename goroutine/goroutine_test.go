@@ -3,8 +3,8 @@ package goroutine
 import (
 	"context"
 	"fmt"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/algmib/kit"
 	"sync"
 	"testing"
 	"time"

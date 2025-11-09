@@ -7,8 +7,8 @@ package mocks
 import (
 	"context"
 
+	"github.com/mikhailbolshakov/kit/rpc"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/rpc"
 )
 
 // NewRpcDistributedKeys creates a new instance of RpcDistributedKeys. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

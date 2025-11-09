@@ -17,7 +17,7 @@ A Go library for Aerospike database connectivity, providing simple connection ma
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/aerospike"
+import "github.com/mikhailbolshakov/kit/aerospike"
 ----
 
 == Basic Usage
@@ -32,7 +32,7 @@ import (
     "context"
     "log"
 
-    "gitlab.com/algmib/kit/aerospike"
+    "github.com/mikhailbolshakov/kit/aerospike"
 )
 
 func main() {
@@ -91,7 +91,7 @@ import (
     "context"
     "log"
 
-    "gitlab.com/algmib/kit/aerospike"
+    "github.com/mikhailbolshakov/kit/aerospike"
 )
 
 type UserData struct {
@@ -219,7 +219,7 @@ if err != nil {
 == Dependencies
 
 * `github.com/aerospike/aerospike-client-go/v7` - Aerospike Go client
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

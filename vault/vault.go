@@ -6,7 +6,7 @@ import (
 	"time"
 
 	lib "github.com/hashicorp/vault/api"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 const (

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"gotest.tools/assert"
 )
 

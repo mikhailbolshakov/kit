@@ -4,7 +4,7 @@ import (
 	"context"
 
 	aero "github.com/aerospike/aerospike-client-go/v7"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 )
 
 func Decode[T any](ctx context.Context, bin string, rec *aero.Record) (*T, error) {

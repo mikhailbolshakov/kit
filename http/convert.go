@@ -3,7 +3,7 @@ package http
 import (
 	"context"
 	"fmt"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"regexp"
 	"strings"
 )

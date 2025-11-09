@@ -7,8 +7,8 @@ package mocks
 import (
 	"context"
 
+	"github.com/mikhailbolshakov/kit/centrifugo/proto"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/centrifugo/proto"
 	"google.golang.org/grpc"
 )
 

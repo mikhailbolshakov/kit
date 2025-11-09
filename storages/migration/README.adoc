@@ -16,7 +16,7 @@ A Go library for database migrations using Goose, providing simple up/down migra
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/migration"
+import "github.com/mikhailbolshakov/kit/migration"
 ----
 
 == Basic Usage
@@ -31,7 +31,7 @@ import (
     "database/sql"
     "log"
 
-    "gitlab.com/algmib/kit/migration"
+    "github.com/mikhailbolshakov/kit/migration"
     _ "github.com/lib/pq"
 )
 
@@ -72,7 +72,7 @@ import (
     "log"
     "os"
 
-    "gitlab.com/algmib/kit/migration"
+    "github.com/mikhailbolshakov/kit/migration"
     _ "github.com/lib/pq"
 )
 
@@ -203,7 +203,7 @@ err := mig.Up()
 
 * `github.com/pressly/goose/v3` - Migration tool
 * `github.com/lib/pq` - PostgreSQL driver
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

@@ -1,11 +1,11 @@
 package impl
 
 import (
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/localization"
+	kitMock "github.com/mikhailbolshakov/kit/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/localization"
-	kitMock "gitlab.com/algmib/kit/mocks"
 	"strings"
 	"testing"
 )

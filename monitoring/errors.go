@@ -1,6 +1,6 @@
 package monitoring
 
-import "gitlab.com/algmib/kit"
+import "github.com/mikhailbolshakov/kit"
 
 const (
 	ErrCodePrometheusRegisterGoMetrics      = "MON-001"

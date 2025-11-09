@@ -5,8 +5,8 @@
 package mocks
 
 import (
+	"github.com/mikhailbolshakov/kit/monitoring"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/monitoring"
 )
 
 // NewMonitoringErrorMonitoring creates a new instance of MonitoringErrorMonitoring. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

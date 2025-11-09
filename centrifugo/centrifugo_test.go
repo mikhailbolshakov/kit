@@ -4,8 +4,8 @@ package centrifugo
 
 import (
 	"github.com/centrifugal/centrifuge-go"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
 	"math"
 	"testing"
 	"time"

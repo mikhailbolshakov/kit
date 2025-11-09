@@ -16,7 +16,7 @@ A Go framework for building microservices with built-in CLI support, database mi
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/cluster"
+import "github.com/mikhailbolshakov/kit/cluster"
 ----
 
 == Basic Usage
@@ -227,9 +227,9 @@ import (
     "log"
     "net/http"
 
-    "gitlab.com/algmib/kit/cluster"
-    kitStorage "gitlab.com/algmib/kit/storages/pg"
-    "gitlab.com/algmib/kit/storages/clickhouse"
+    "github.com/mikhailbolshakov/kit/cluster"
+    kitStorage "github.com/mikhailbolshakov/kit/storages/pg"
+    "github.com/mikhailbolshakov/kit/storages/clickhouse"
 )
 
 type Config struct {

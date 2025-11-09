@@ -17,7 +17,7 @@ A Go library for MinIO object storage operations, providing simple file upload, 
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/minio"
+import "github.com/mikhailbolshakov/kit/minio"
 ----
 
 == Basic Usage
@@ -33,7 +33,7 @@ import (
     "log"
     "strings"
 
-    "gitlab.com/algmib/kit/minio"
+    "github.com/mikhailbolshakov/kit/minio"
 )
 
 func main() {
@@ -112,7 +112,7 @@ import (
     "log"
     "os"
 
-    "gitlab.com/algmib/kit/minio"
+    "github.com/mikhailbolshakov/kit/minio"
 )
 
 func main() {
@@ -272,7 +272,7 @@ if !client.IsBucketExist(ctx, "my-bucket") {
 
 * `github.com/minio/minio-go/v7` - MinIO Go SDK
 * `github.com/mitchellh/mapstructure` - Struct mapping
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

@@ -15,7 +15,7 @@ A Go client library for integrating with Centrifugo real-time messaging server, 
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/centrifugo"
+import "github.com/mikhailbolshakov/kit/centrifugo"
 ----
 
 == Configuration
@@ -234,8 +234,8 @@ import (
     "log"
     "time"
 
-    "gitlab.com/algmib/kit"
-    "gitlab.com/algmib/kit/centrifugo"
+    "github.com/mikhailbolshakov/kit"
+    "github.com/mikhailbolshakov/kit/centrifugo"
     "github.com/centrifugal/centrifuge-go"
 )
 

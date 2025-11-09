@@ -17,7 +17,7 @@ A Go library providing structured request context management for distributed app
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit"
+import "github.com/mikhailbolshakov/kit"
 ----
 
 == Basic Usage
@@ -33,7 +33,7 @@ import (
     "fmt"
     "log"
 
-    "gitlab.com/algmib/kit"
+    "github.com/mikhailbolshakov/kit"
     "golang.org/x/text/language"
 )
 
@@ -88,7 +88,7 @@ import (
     "fmt"
     "net/http"
 
-    "gitlab.com/algmib/kit"
+    "github.com/mikhailbolshakov/kit"
     "golang.org/x/text/language"
 )
 
@@ -395,7 +395,7 @@ if appErr, ok := kit.IsAppErr(err); ok {
 * `golang.org/x/text/language` - Language tag support
 * `google.golang.org/grpc/metadata` - gRPC metadata integration
 * `github.com/mitchellh/mapstructure` - Map-to-struct conversion
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 

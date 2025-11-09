@@ -4,8 +4,8 @@ package grpc
 
 import (
 	"context"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/algmib/kit"
 	"google.golang.org/grpc/codes"
 	"testing"
 	"time"

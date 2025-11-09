@@ -3,8 +3,8 @@ package v7
 import (
 	"context"
 	"fmt"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/olivere/elastic/v7"
-	"gitlab.com/algmib/kit"
 	"reflect"
 	"strings"
 )

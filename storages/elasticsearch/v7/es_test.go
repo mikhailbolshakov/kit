@@ -5,9 +5,9 @@ package v7
 import (
 	"context"
 	"fmt"
+	"github.com/mikhailbolshakov/kit"
 	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/algmib/kit"
 	"reflect"
 	"testing"
 )

@@ -2,8 +2,8 @@ package event
 
 import (
 	"context"
-	"gitlab.com/algmib/kit"
-	"gitlab.com/algmib/kit/goroutine"
+	"github.com/mikhailbolshakov/kit"
+	"github.com/mikhailbolshakov/kit/goroutine"
 	"reflect"
 	"sync"
 )

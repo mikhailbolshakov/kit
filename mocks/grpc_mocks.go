@@ -7,8 +7,8 @@ package mocks
 import (
 	"context"
 
+	"github.com/mikhailbolshakov/kit/grpc"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/algmib/kit/grpc"
 	grpc0 "google.golang.org/grpc"
 )
 

@@ -2,7 +2,7 @@ package google
 
 import (
 	"context"
-	"gitlab.com/algmib/kit"
+	"github.com/mikhailbolshakov/kit"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 	"io"

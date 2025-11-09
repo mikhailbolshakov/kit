@@ -13,7 +13,7 @@ A Go library for efficient batch processing of items. Collects items and process
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit/batch"
+import "github.com/mikhailbolshakov/kit/batch"
 ----
 
 == Basic Usage

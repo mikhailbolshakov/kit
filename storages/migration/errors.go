@@ -1,6 +1,6 @@
 package migration
 
-import "gitlab.com/algmib/kit"
+import "github.com/mikhailbolshakov/kit"
 
 const (
 	ErrCodeGooseFolderNotFound     = "GS-001"

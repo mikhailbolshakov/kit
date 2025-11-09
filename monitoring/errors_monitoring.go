@@ -1,8 +1,8 @@
 package monitoring
 
 import (
+	"github.com/mikhailbolshakov/kit"
 	"github.com/prometheus/client_golang/prometheus"
-	"gitlab.com/algmib/kit"
 )
 
 const (

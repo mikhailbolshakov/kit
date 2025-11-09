@@ -16,7 +16,7 @@ A Go library providing system-level utilities for asynchronous operations, inclu
 
 [source,go]
 ----
-import "gitlab.com/algmib/kit"
+import "github.com/mikhailbolshakov/kit"
 ----
 
 == Basic Usage
@@ -110,7 +110,7 @@ linearConfig := kit.RetryCfg{
 == Dependencies
 
 * `go.uber.org/atomic` - Atomic operations for thread-safe counters
-* Kit utilities via `gitlab.com/algmib/kit`
+* Kit utilities via `github.com/mikhailbolshakov/kit`
 
 == Thread Safety
 
